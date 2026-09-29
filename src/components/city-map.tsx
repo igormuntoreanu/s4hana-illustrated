@@ -26,7 +26,16 @@ const ROOM_W = 1792;
 const ROOM_H = 1008;
 
 type LayoutId = "village" | "city";
-const LAYOUTS: LayoutId[] = ["village", "city"];
+
+const BOOT_BUBBLES: Array<[string, string, string, string]> = [
+  ["IF", "0%", "6px", "0s"],
+  ["DATA:", "34%", "24px", "0.35s"],
+  ["{", "68%", "0px", "0.7s"],
+  ["LOOP", "14%", "58px", "0.15s"],
+  ["01", "52%", "48px", "0.95s"],
+  ["=>", "4%", "86px", "0.55s"],
+  ["END", "46%", "78px", "1.15s"],
+];
 
 type Cam = { x: number; y: number; s: number };
 
@@ -47,16 +56,16 @@ const SHORT: Record<string, string> = {
   project: "Projects",
 };
 const VILLAGE_PLOTS: Plot[] = [
-  { id: "rnd", cx: 27, cy: 18, w: 14, h: 16 },
-  { id: "finance", cx: 50, cy: 16, w: 16, h: 16 },
-  { id: "hr", cx: 73, cy: 18, w: 14, h: 16 },
-  { id: "procurement", cx: 17, cy: 38, w: 14, h: 16 },
-  { id: "sales", cx: 82, cy: 38, w: 14, h: 16 },
-  { id: "supply", cx: 27, cy: 56, w: 14, h: 16 },
-  { id: "manufacturing", cx: 68, cy: 54, w: 14, h: 16 },
-  { id: "asset", cx: 46, cy: 50, w: 14, h: 16 },
-  { id: "service", cx: 80, cy: 74, w: 14, h: 16 },
-  { id: "project", cx: 16, cy: 76, w: 13, h: 16 },
+  { id: "rnd", cx: 12, cy: 20, w: 12, h: 16 },
+  { id: "finance", cx: 33, cy: 24, w: 14, h: 18 },
+  { id: "hr", cx: 84, cy: 20, w: 12, h: 16 },
+  { id: "procurement", cx: 25, cy: 42, w: 12, h: 12 },
+  { id: "sales", cx: 67, cy: 56, w: 10, h: 12 },
+  { id: "supply", cx: 28, cy: 60, w: 12, h: 14 },
+  { id: "manufacturing", cx: 76, cy: 50, w: 12, h: 14 },
+  { id: "asset", cx: 68, cy: 36, w: 12, h: 14 },
+  { id: "service", cx: 84, cy: 72, w: 12, h: 14 },
+  { id: "project", cx: 10, cy: 76, w: 12, h: 14 },
 ];
 
 /** Same stations, on the daylight industrial city. */
@@ -88,16 +97,16 @@ const GOTHAM_PLOTS: Plot[] = [
 
 /** Bases of the markers, on open ground, not on the roofs. */
 const VILLAGE_TREES: Record<string, { cx: number; cy: number }> = {
-  rnd: { cx: 36, cy: 28 },
-  finance: { cx: 42, cy: 28 },
-  people: { cx: 64, cy: 28 },
-  procurement: { cx: 26, cy: 46 },
-  sales: { cx: 74, cy: 46 },
-  supply: { cx: 36, cy: 64 },
-  mfg: { cx: 60, cy: 62 },
-  maint: { cx: 55, cy: 58 },
-  service: { cx: 70, cy: 82 },
-  project: { cx: 26, cy: 84 },
+  rnd: { cx: 20, cy: 30 },
+  finance: { cx: 30, cy: 34 },
+  people: { cx: 76, cy: 28 },
+  procurement: { cx: 33, cy: 48 },
+  sales: { cx: 62, cy: 64 },
+  supply: { cx: 36, cy: 76 },
+  mfg: { cx: 82, cy: 62 },
+  maint: { cx: 60, cy: 44 },
+  service: { cx: 76, cy: 80 },
+  project: { cx: 20, cy: 84 },
 };
 
 const CITY_MARKS: Record<string, { cx: number; cy: number }> = {
@@ -255,20 +264,13 @@ export function CityMap() {
   const mark = useProgress((s) => s.mark);
   const [layout, setLayout] = useState<LayoutId>("village");
   const plots = layout === "city" ? CITY_PLOTS : VILLAGE_PLOTS;
-
-  function stepLayout(dir: -1 | 1) {
-    setLayout((cur) => {
-      const index = LAYOUTS.indexOf(cur);
-      return LAYOUTS[(index + dir + LAYOUTS.length) % LAYOUTS.length];
-    });
-    setHover(null);
-  }
   const frame = useRef<HTMLDivElement>(null);
   const camRef = useRef<Cam>({ x: MAP_W / 2, y: MAP_H / 2, s: 0.4 });
   const [cam, setCam] = useState<Cam>(camRef.current);
   const [vw, setVw] = useState(390);
   const [vh, setVh] = useState(700);
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const [bootHold, setBootHold] = useState(true);
   const [inside, setInside] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [station, setStation] = useState<Station | null>(null);
@@ -472,15 +474,6 @@ export function CityMap() {
     if (pointers.current.size < 2) pinch.current = null;
     const d = drag.current;
     drag.current = null;
-    if (d && !inside) {
-      const dx = e.clientX - d.x;
-      const dy = e.clientY - d.y;
-      if (Math.abs(dx) > 72 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-        publish({ x: d.cx, y: d.cy, s: camRef.current.s });
-        stepLayout(dx < 0 ? 1 : -1);
-        return;
-      }
-    }
     if (!d || d.moved) return;
     if ((e.target as HTMLElement).closest("button")) return;
     const wpt = clientToWorld(e.clientX, e.clientY);
@@ -501,11 +494,29 @@ export function CityMap() {
   const room = inside ? ROOMS[inside] : null;
   const wing = inside ? wingById(inside) : null;
   const bridge = bridges.find((b) => b.id === bridgeId) ?? null;
-  const sceneSrc = room ? room.src : layout === "city" ? "/art/city-map.jpg" : "/art/campus-map.jpg";
+  const sceneSrc = room
+    ? layout === "city"
+      ? `${room.city}?v=5`
+      : room.src
+    : layout === "city"
+      ? "/art/city-map.jpg"
+      : "/art/campus-map.jpg?v=4";
   const sceneReady = loadedSrc === sceneSrc;
+  const mapReady = sceneReady && !bootHold;
 
   useEffect(() => {
-    const urls = ["/art/campus-map.jpg", "/art/city-map.jpg", ...Object.values(ROOMS).map((r) => r.src)];
+    if (inside) return;
+    setBootHold(true);
+    const timer = window.setTimeout(() => setBootHold(false), 900);
+    return () => window.clearTimeout(timer);
+  }, [sceneSrc, inside]);
+
+  useEffect(() => {
+    const urls = [
+      "/art/campus-map.jpg?v=4",
+      "/art/city-map.jpg",
+      ...Object.values(ROOMS).flatMap((r) => [r.src, `${r.city}?v=5`]),
+    ];
     for (const url of urls) {
       const img = new Image();
       img.src = url;
@@ -523,23 +534,29 @@ export function CityMap() {
     <div className="relative h-dvh overflow-hidden bg-paper text-ink">
       <div
         ref={frame}
-        className="absolute inset-0 touch-none select-none"
+        className="absolute inset-0 touch-none select-none campus-lights"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
         <img
+          key={sceneSrc}
           src={sceneSrc}
           alt={wing ? `${wing.name} interior` : "Illustrated neighborhood of the S/4HANA campus"}
           draggable={false}
           width={worldW}
           height={worldH}
           ref={(el) => {
-            if (el && el.complete && el.naturalWidth > 0 && el.getAttribute("src") === sceneSrc) setLoadedSrc(sceneSrc);
+            if (!el || !el.complete || el.naturalWidth === 0) return;
+            const path = el.currentSrc ? new URL(el.currentSrc).pathname : "";
+            if (path.endsWith(sceneSrc.split("?")[0])) setLoadedSrc(sceneSrc);
           }}
-          onLoad={(event) => setLoadedSrc(event.currentTarget.getAttribute("src"))}
-          className={`absolute top-0 left-0 max-w-none ${sceneReady ? "" : "opacity-0"}`}
+          onLoad={(event) => {
+            const path = event.currentTarget.currentSrc ? new URL(event.currentTarget.currentSrc).pathname : "";
+            if (path.endsWith(sceneSrc.split("?")[0])) setLoadedSrc(sceneSrc);
+          }}
+          className={`absolute top-0 left-0 max-w-none ${(inside ? sceneReady : mapReady) ? "" : "opacity-0"}`}
           style={{
             width: worldW,
             height: worldH,
@@ -547,7 +564,22 @@ export function CityMap() {
             transformOrigin: "0 0",
           }}
         />
-        {sceneReady && !inside && bridge && (
+        {!inside && !mapReady && (
+          <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center" role="status" aria-live="polite">
+            <div className="map-boot">
+              {BOOT_BUBBLES.map(([token, left, bottom, delay]) => (
+                <span key={token} className="map-bubble" style={{ left, bottom, animationDelay: delay }}>
+                  {token}
+                </span>
+              ))}
+              <p className="map-boot-line">
+                <span className="map-boot-prompt">{">"}</span> loading {layout}
+                <span className="map-boot-cursor">_</span>
+              </p>
+            </div>
+          </div>
+        )}
+        {mapReady && !inside && bridge && (
           <svg
             className="pointer-events-none absolute top-0 left-0"
             width={MAP_W}
@@ -576,7 +608,7 @@ export function CityMap() {
           </svg>
         )}
 
-        {sceneReady && !inside &&
+        {mapReady && !inside &&
           masterTrees.map((tree) => {
             const marks = layout === "city" ? CITY_MARKS : VILLAGE_TREES;
             const spot = marks[tree.id];
@@ -602,7 +634,7 @@ export function CityMap() {
             );
           })}
 
-        {sceneReady && !inside &&
+        {mapReady && !inside &&
           plots.map((plot) => {
             const c = plotCenter(plot);
             const pos = toScreen(c.x, c.y);
@@ -723,7 +755,7 @@ export function CityMap() {
               </div>
             )}
             <p className="text-xs text-muted tabular-nums">
-              {inside ? "Tap a numbered station" : `${stampedCount(read)}/${wings.length} stamped · swipe left or right to change the city`}
+              {inside ? "Tap a numbered station" : `${stampedCount(read)}/${wings.length} stamped`}
             </p>
           </div>
         </div>

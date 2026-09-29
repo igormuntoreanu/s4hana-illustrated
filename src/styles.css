@@ -60,7 +60,107 @@
   }
 }
 
+@property --twinkle {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+.campus-lights {
+  animation: campus-twinkle 3.6s ease-in-out infinite;
+}
+
+.map-boot {
+  position: relative;
+  width: 220px;
+  height: 168px;
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+}
+
+.map-bubble {
+  position: absolute;
+  bottom: 36px;
+  border: 2px solid var(--color-ink);
+  border-radius: 999px;
+  background: var(--color-paper-2);
+  padding: 4px 10px;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  animation: map-bubble 1.6s ease-in infinite;
+}
+
+.map-boot-line {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.map-boot-prompt {
+  margin-right: 6px;
+  color: var(--color-stamp);
+}
+
+.map-boot-cursor {
+  display: inline-block;
+  animation: map-blink 0.8s steps(1) infinite;
+}
+
+@keyframes map-bubble {
+  0% {
+    transform: translateY(12px) scale(0.7);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-92px) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes map-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes campus-twinkle {
+  0%,
+  100% {
+    --twinkle: 1;
+  }
+  50% {
+    --twinkle: 0.08;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .campus-lights {
+    animation: none;
+    --twinkle: 1;
+  }
+
+  .map-bubble,
+  .map-boot-cursor {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
   *,
   *::before,
   *::after {
