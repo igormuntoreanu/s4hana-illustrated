@@ -25,6 +25,9 @@ const MAP_H = 912;
 const ROOM_W = 1792;
 const ROOM_H = 1008;
 
+type LayoutId = "village" | "city";
+const LAYOUTS: LayoutId[] = ["village", "city"];
+
 type Cam = { x: number; y: number; s: number };
 
 type Plot = { id: string; cx: number; cy: number; w: number; h: number };
@@ -56,18 +59,31 @@ const VILLAGE_PLOTS: Plot[] = [
   { id: "project", cx: 16, cy: 76, w: 13, h: 16 },
 ];
 
-/** Same stations, placed on the synthwave city drawing. */
+/** Same stations, on the daylight industrial city. */
 const CITY_PLOTS: Plot[] = [
-  { id: "rnd", cx: 29, cy: 22, w: 16, h: 16 },
-  { id: "finance", cx: 50, cy: 16, w: 14, h: 16 },
-  { id: "hr", cx: 70, cy: 20, w: 14, h: 16 },
-  { id: "procurement", cx: 18, cy: 44, w: 14, h: 14 },
-  { id: "sales", cx: 65, cy: 50, w: 12, h: 14 },
-  { id: "supply", cx: 30, cy: 64, w: 12, h: 12 },
-  { id: "manufacturing", cx: 84, cy: 40, w: 14, h: 16 },
-  { id: "asset", cx: 42, cy: 46, w: 14, h: 14 },
-  { id: "service", cx: 80, cy: 68, w: 14, h: 14 },
-  { id: "project", cx: 22, cy: 70, w: 12, h: 14 },
+  { id: "rnd", cx: 18, cy: 18, w: 16, h: 14 },
+  { id: "finance", cx: 50, cy: 16, w: 16, h: 16 },
+  { id: "hr", cx: 80, cy: 20, w: 12, h: 14 },
+  { id: "procurement", cx: 18, cy: 42, w: 16, h: 14 },
+  { id: "sales", cx: 66, cy: 42, w: 12, h: 14 },
+  { id: "supply", cx: 30, cy: 70, w: 16, h: 14 },
+  { id: "manufacturing", cx: 84, cy: 52, w: 14, h: 16 },
+  { id: "asset", cx: 46, cy: 46, w: 16, h: 14 },
+  { id: "service", cx: 78, cy: 74, w: 14, h: 14 },
+  { id: "project", cx: 10, cy: 68, w: 12, h: 14 },
+];
+
+const GOTHAM_PLOTS: Plot[] = [
+  { id: "rnd", cx: 22, cy: 20, w: 16, h: 14 },
+  { id: "finance", cx: 50, cy: 18, w: 14, h: 16 },
+  { id: "hr", cx: 72, cy: 18, w: 14, h: 16 },
+  { id: "procurement", cx: 24, cy: 42, w: 16, h: 14 },
+  { id: "sales", cx: 64, cy: 46, w: 10, h: 12 },
+  { id: "supply", cx: 36, cy: 62, w: 12, h: 12 },
+  { id: "manufacturing", cx: 80, cy: 52, w: 14, h: 16 },
+  { id: "asset", cx: 46, cy: 48, w: 14, h: 14 },
+  { id: "service", cx: 84, cy: 68, w: 12, h: 12 },
+  { id: "project", cx: 16, cy: 64, w: 10, h: 14 },
 ];
 
 /** Bases of the markers, on open ground, not on the roofs. */
@@ -84,17 +100,30 @@ const VILLAGE_TREES: Record<string, { cx: number; cy: number }> = {
   project: { cx: 26, cy: 84 },
 };
 
-const CITY_BEACONS: Record<string, { cx: number; cy: number }> = {
-  rnd: { cx: 38, cy: 30 },
-  finance: { cx: 42, cy: 28 },
-  people: { cx: 62, cy: 30 },
-  procurement: { cx: 26, cy: 50 },
-  sales: { cx: 72, cy: 56 },
-  supply: { cx: 36, cy: 70 },
-  mfg: { cx: 76, cy: 48 },
-  maint: { cx: 50, cy: 52 },
-  service: { cx: 72, cy: 74 },
-  project: { cx: 16, cy: 78 },
+const CITY_MARKS: Record<string, { cx: number; cy: number }> = {
+  rnd: { cx: 28, cy: 26 },
+  finance: { cx: 40, cy: 28 },
+  people: { cx: 72, cy: 28 },
+  procurement: { cx: 28, cy: 50 },
+  sales: { cx: 74, cy: 50 },
+  supply: { cx: 40, cy: 78 },
+  mfg: { cx: 74, cy: 60 },
+  maint: { cx: 56, cy: 54 },
+  service: { cx: 70, cy: 80 },
+  project: { cx: 18, cy: 78 },
+};
+
+const GOTHAM_MARKS: Record<string, { cx: number; cy: number }> = {
+  rnd: { cx: 32, cy: 28 },
+  finance: { cx: 42, cy: 30 },
+  people: { cx: 64, cy: 28 },
+  procurement: { cx: 34, cy: 50 },
+  sales: { cx: 70, cy: 52 },
+  supply: { cx: 30, cy: 70 },
+  mfg: { cx: 72, cy: 60 },
+  maint: { cx: 54, cy: 56 },
+  service: { cx: 76, cy: 74 },
+  project: { cx: 22, cy: 74 },
 };
 
 const ROOMS: Record<string, { src: string; city: string; spots: Spot[] }> = {
@@ -224,13 +253,22 @@ function clampCam(c: Cam, vw: number, vh: number, w: number, h: number, minS: nu
 export function CityMap() {
   const read = useProgress((s) => s.read);
   const mark = useProgress((s) => s.mark);
-  const [layout, setLayout] = useState<"village" | "city">("village");
+  const [layout, setLayout] = useState<LayoutId>("village");
   const plots = layout === "city" ? CITY_PLOTS : VILLAGE_PLOTS;
+
+  function stepLayout(dir: -1 | 1) {
+    setLayout((cur) => {
+      const index = LAYOUTS.indexOf(cur);
+      return LAYOUTS[(index + dir + LAYOUTS.length) % LAYOUTS.length];
+    });
+    setHover(null);
+  }
   const frame = useRef<HTMLDivElement>(null);
   const camRef = useRef<Cam>({ x: MAP_W / 2, y: MAP_H / 2, s: 0.4 });
   const [cam, setCam] = useState<Cam>(camRef.current);
   const [vw, setVw] = useState(390);
   const [vh, setVh] = useState(700);
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const [inside, setInside] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [station, setStation] = useState<Station | null>(null);
@@ -353,47 +391,25 @@ export function CityMap() {
   }
 
   function enter(id: string) {
-    if (holdEnter.current || entering.current || inside) return;
-    const plot = plots.find((p) => p.id === id);
-    if (!plot) return;
-    entering.current = true;
-    const c = plotCenter(plot);
-    const bw = (plot.w / 100) * MAP_W;
-    const s = Math.min(1.7, Math.max(camRef.current.s, (vw * 0.62) / bw));
-    animateTo({ x: c.x, y: c.y, s }, 420, () => {
-      setInside(id);
-      setHover(null);
-      entering.current = false;
-      const fit = fitScale(vw, vh, ROOM_W, ROOM_H);
-      const start = Math.max(fit, Math.min(vw < 700 ? 0.58 : fit * 1.15, 0.9));
-      const next = clampCam(
-        { x: ROOM_W / 2, y: ROOM_H / 2, s: start },
-        vw,
-        vh,
-        ROOM_W,
-        ROOM_H,
-        fit * 0.96,
-        2.4,
-      );
-      camRef.current = next;
-      setCam(next);
-    });
+    if (!ROOMS[id]) return;
+    setHover(null);
+    setStation(null);
+    setInside(id);
+    const fit = fitScale(vw, vh, ROOM_W, ROOM_H);
+    const start = Math.max(fit, Math.min(vw < 700 ? 0.72 : fit, 1));
+    const next = clampCam({ x: ROOM_W / 2, y: ROOM_H / 2, s: start }, vw, vh, ROOM_W, ROOM_H, fit * 0.96, 2.4);
+    camRef.current = next;
+    setCam(next);
   }
 
   function leave() {
-    const id = inside;
-    holdEnter.current = true;
     setInside(null);
     setHover(null);
-    const plot = plots.find((p) => p.id === id);
+    setStation(null);
     const fit = fitScale(vw, vh, MAP_W, MAP_H);
-    const c = plot ? plotCenter(plot) : { x: MAP_W / 2, y: MAP_H / 2 };
-    const next = clampCam({ x: c.x, y: c.y, s: Math.max(fit, 0.36) }, vw, vh, MAP_W, MAP_H, fit * 0.96, 2.2);
+    const next = clampCam({ x: MAP_W / 2, y: MAP_H / 2, s: Math.max(fit, 0.36) }, vw, vh, MAP_W, MAP_H, fit * 0.96, 2.2);
     camRef.current = next;
     setCam(next);
-    window.setTimeout(() => {
-      holdEnter.current = false;
-    }, 500);
   }
 
   function clientToWorld(cx: number, cy: number) {
@@ -456,19 +472,22 @@ export function CityMap() {
     if (pointers.current.size < 2) pinch.current = null;
     const d = drag.current;
     drag.current = null;
+    if (d && !inside) {
+      const dx = e.clientX - d.x;
+      const dy = e.clientY - d.y;
+      if (Math.abs(dx) > 72 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        publish({ x: d.cx, y: d.cy, s: camRef.current.s });
+        stepLayout(dx < 0 ? 1 : -1);
+        return;
+      }
+    }
     if (!d || d.moved) return;
     if ((e.target as HTMLElement).closest("button")) return;
     const wpt = clientToWorld(e.clientX, e.clientY);
     if (!inside) {
       const plot = hitPlot(wpt.x, wpt.y);
       if (!plot) return;
-      const bw = (plot.w / 100) * MAP_W * camRef.current.s;
-      if (bw > 220) enter(plot.id);
-      else {
-        const c = plotCenter(plot);
-        const s = Math.min(1.15, (vw * 0.55) / ((plot.w / 100) * MAP_W));
-        animateTo({ x: c.x, y: c.y, s }, 380);
-      }
+      enter(plot.id);
       return;
     }
     const room = ROOMS[inside];
@@ -479,18 +498,19 @@ export function CityMap() {
     }
   }
 
-  useEffect(() => {
-    if (inside || holdEnter.current) return;
-    const c = camRef.current;
-    const plot = hitPlot(c.x, c.y);
-    if (!plot) return;
-    const bw = (plot.w / 100) * MAP_W * c.s;
-    if (bw > 300 && c.s > 0.95) enter(plot.id);
-  }, [cam.s, cam.x, cam.y, inside]);
-
   const room = inside ? ROOMS[inside] : null;
   const wing = inside ? wingById(inside) : null;
   const bridge = bridges.find((b) => b.id === bridgeId) ?? null;
+  const sceneSrc = room ? room.src : layout === "city" ? "/art/city-map.jpg" : "/art/campus-map.jpg";
+  const sceneReady = loadedSrc === sceneSrc;
+
+  useEffect(() => {
+    const urls = ["/art/campus-map.jpg", "/art/city-map.jpg", ...Object.values(ROOMS).map((r) => r.src)];
+    for (const url of urls) {
+      const img = new Image();
+      img.src = url;
+    }
+  }, []);
 
   function toScreen(x: number, y: number) {
     return {
@@ -510,12 +530,16 @@ export function CityMap() {
         onPointerCancel={onPointerUp}
       >
         <img
-          src={room ? (layout === "city" ? room.city : room.src) : layout === "city" ? "/art/city-map.jpg" : "/art/campus-map.jpg"}
+          src={sceneSrc}
           alt={wing ? `${wing.name} interior` : "Illustrated neighborhood of the S/4HANA campus"}
           draggable={false}
           width={worldW}
           height={worldH}
-          className="absolute top-0 left-0 max-w-none"
+          ref={(el) => {
+            if (el && el.complete && el.naturalWidth > 0 && el.getAttribute("src") === sceneSrc) setLoadedSrc(sceneSrc);
+          }}
+          onLoad={(event) => setLoadedSrc(event.currentTarget.getAttribute("src"))}
+          className={`absolute top-0 left-0 max-w-none ${sceneReady ? "" : "opacity-0"}`}
           style={{
             width: worldW,
             height: worldH,
@@ -523,7 +547,7 @@ export function CityMap() {
             transformOrigin: "0 0",
           }}
         />
-        {!inside && bridge && (
+        {sceneReady && !inside && bridge && (
           <svg
             className="pointer-events-none absolute top-0 left-0"
             width={MAP_W}
@@ -552,9 +576,10 @@ export function CityMap() {
           </svg>
         )}
 
-        {!inside &&
+        {sceneReady && !inside &&
           masterTrees.map((tree) => {
-            const spot = (layout === "city" ? CITY_BEACONS : VILLAGE_TREES)[tree.id];
+            const marks = layout === "city" ? CITY_MARKS : VILLAGE_TREES;
+            const spot = marks[tree.id];
             const pos = toScreen(((spot?.cx ?? tree.cx) / 100) * MAP_W, ((spot?.cy ?? tree.cy) / 100) * MAP_H);
             const hot = treeHover === tree.id || masterId === tree.id;
             return (
@@ -565,7 +590,7 @@ export function CityMap() {
                 scale={cam.s}
                 sign={tree.sign}
                 hot={hot}
-                variant={layout === "city" ? "beacon" : "tree"}
+                variant={layout === "city" ? "lamp" : "tree"}
                 onOpen={() => {
                   setTreeHover(null);
                   setHover(null);
@@ -577,7 +602,7 @@ export function CityMap() {
             );
           })}
 
-        {!inside &&
+        {sceneReady && !inside &&
           plots.map((plot) => {
             const c = plotCenter(plot);
             const pos = toScreen(c.x, c.y);
@@ -615,7 +640,7 @@ export function CityMap() {
             );
           })}
 
-        {inside &&
+        {sceneReady && inside &&
           room?.spots.map((spot, index) => {
             const pos = toScreen((spot.x / 100) * ROOM_W, (spot.y / 100) * ROOM_H);
             const st = wing?.stations.find((s) => s.id === spot.id);
@@ -675,35 +700,30 @@ export function CityMap() {
             </p>
             <h1 className="text-lg leading-tight font-semibold">{inside ? wing?.name : "S/4HANA Illustrated"}</h1>
             {!inside && (
-              <div className="mt-2 flex rounded-full border border-line bg-paper p-0.5" role="group" aria-label="Map layout">
-                <button
-                  type="button"
-                  aria-pressed={layout === "village"}
-                  className={`min-h-8 rounded-full px-3 text-xs font-bold ${layout === "village" ? "bg-ink text-paper" : "text-ink"}`}
-                  onClick={() => {
-                    setLayout("village");
-                    setHover(null);
-                  }}
-                >
-                  Village
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={layout === "city"}
-                  className={`min-h-8 rounded-full px-3 text-xs font-bold ${layout === "city" ? "bg-ink text-paper" : "text-ink"}`}
-                  onClick={() => {
-                    setLayout("city");
-                    setHover(null);
-                  }}
-                >
-                  City
-                </button>
+              <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label="Map layout">
+                {(
+                  [
+                    ["village", "Village"],
+                    ["city", "City"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={layout === id}
+                    className={`min-h-11 rounded-full px-3 text-sm font-bold ${layout === id ? "bg-ink text-paper" : "border border-line bg-paper text-ink"}`}
+                    onClick={() => {
+                      setLayout(id);
+                      setHover(null);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             )}
             <p className="text-xs text-muted tabular-nums">
-              {inside
-                ? "Tap a numbered station"
-                : `${stampedCount(read)}/${wings.length} stamped · drag, pinch, scroll`}
+              {inside ? "Tap a numbered station" : `${stampedCount(read)}/${wings.length} stamped · swipe left or right to change the city`}
             </p>
           </div>
         </div>
