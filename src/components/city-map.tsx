@@ -44,48 +44,63 @@ const SHORT: Record<string, string> = {
   project: "Projects",
 };
 const VILLAGE_PLOTS: Plot[] = [
-  { id: "rnd", cx: 22, cy: 10, w: 14, h: 16 },
-  { id: "finance", cx: 50, cy: 13, w: 16, h: 16 },
-  { id: "hr", cx: 74, cy: 13, w: 14, h: 16 },
-  { id: "procurement", cx: 16, cy: 32, w: 14, h: 16 },
+  { id: "rnd", cx: 27, cy: 18, w: 14, h: 16 },
+  { id: "finance", cx: 50, cy: 16, w: 16, h: 16 },
+  { id: "hr", cx: 73, cy: 18, w: 14, h: 16 },
+  { id: "procurement", cx: 17, cy: 38, w: 14, h: 16 },
   { id: "sales", cx: 82, cy: 38, w: 14, h: 16 },
-  { id: "supply", cx: 27, cy: 55, w: 14, h: 16 },
-  { id: "manufacturing", cx: 66, cy: 58, w: 16, h: 18 },
-  { id: "asset", cx: 40, cy: 70, w: 14, h: 14 },
-  { id: "service", cx: 79, cy: 72, w: 14, h: 16 },
-  { id: "project", cx: 14, cy: 76, w: 13, h: 16 },
+  { id: "supply", cx: 27, cy: 56, w: 14, h: 16 },
+  { id: "manufacturing", cx: 68, cy: 54, w: 14, h: 16 },
+  { id: "asset", cx: 46, cy: 50, w: 14, h: 16 },
+  { id: "service", cx: 80, cy: 74, w: 14, h: 16 },
+  { id: "project", cx: 16, cy: 76, w: 13, h: 16 },
 ];
 
-/** Same stations, placed on the industrial city drawing. */
+/** Same stations, placed on the synthwave city drawing. */
 const CITY_PLOTS: Plot[] = [
-  { id: "rnd", cx: 19, cy: 18, w: 18, h: 18 },
-  { id: "finance", cx: 51, cy: 16, w: 16, h: 18 },
-  { id: "hr", cx: 80, cy: 16, w: 14, h: 18 },
-  { id: "procurement", cx: 36, cy: 38, w: 16, h: 16 },
-  { id: "sales", cx: 63, cy: 40, w: 14, h: 16 },
-  { id: "supply", cx: 24, cy: 54, w: 18, h: 16 },
-  { id: "manufacturing", cx: 73, cy: 58, w: 16, h: 16 },
-  { id: "asset", cx: 43, cy: 63, w: 12, h: 14 },
-  { id: "service", cx: 87, cy: 70, w: 14, h: 16 },
-  { id: "project", cx: 11, cy: 76, w: 14, h: 16 },
+  { id: "rnd", cx: 29, cy: 22, w: 16, h: 16 },
+  { id: "finance", cx: 50, cy: 16, w: 14, h: 16 },
+  { id: "hr", cx: 70, cy: 20, w: 14, h: 16 },
+  { id: "procurement", cx: 18, cy: 44, w: 14, h: 14 },
+  { id: "sales", cx: 65, cy: 50, w: 12, h: 14 },
+  { id: "supply", cx: 30, cy: 64, w: 12, h: 12 },
+  { id: "manufacturing", cx: 84, cy: 40, w: 14, h: 16 },
+  { id: "asset", cx: 42, cy: 46, w: 14, h: 14 },
+  { id: "service", cx: 80, cy: 68, w: 14, h: 14 },
+  { id: "project", cx: 22, cy: 70, w: 12, h: 14 },
 ];
 
-const CITY_TREES: Record<string, { cx: number; cy: number }> = {
-  rnd: { cx: 31, cy: 24 },
-  finance: { cx: 40, cy: 22 },
-  people: { cx: 70, cy: 22 },
-  procurement: { cx: 27, cy: 42 },
-  sales: { cx: 73, cy: 44 },
-  supply: { cx: 14, cy: 58 },
-  mfg: { cx: 62, cy: 64 },
-  maint: { cx: 35, cy: 68 },
-  service: { cx: 78, cy: 76 },
-  project: { cx: 20, cy: 84 },
+/** Bases of the markers, on open ground, not on the roofs. */
+const VILLAGE_TREES: Record<string, { cx: number; cy: number }> = {
+  rnd: { cx: 36, cy: 28 },
+  finance: { cx: 42, cy: 28 },
+  people: { cx: 64, cy: 28 },
+  procurement: { cx: 26, cy: 46 },
+  sales: { cx: 74, cy: 46 },
+  supply: { cx: 36, cy: 64 },
+  mfg: { cx: 60, cy: 62 },
+  maint: { cx: 55, cy: 58 },
+  service: { cx: 70, cy: 82 },
+  project: { cx: 26, cy: 84 },
 };
 
-const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
+const CITY_BEACONS: Record<string, { cx: number; cy: number }> = {
+  rnd: { cx: 38, cy: 30 },
+  finance: { cx: 42, cy: 28 },
+  people: { cx: 62, cy: 30 },
+  procurement: { cx: 26, cy: 50 },
+  sales: { cx: 72, cy: 56 },
+  supply: { cx: 36, cy: 70 },
+  mfg: { cx: 76, cy: 48 },
+  maint: { cx: 50, cy: 52 },
+  service: { cx: 72, cy: 74 },
+  project: { cx: 16, cy: 78 },
+};
+
+const ROOMS: Record<string, { src: string; city: string; spots: Spot[] }> = {
   finance: {
     src: "/art/room-finance.jpg",
+    city: "/art/city-room-finance.jpg",
     spots: [
       { id: "fin-uj", x: 16, y: 52 },
       { id: "fin-gl", x: 34, y: 64 },
@@ -99,6 +114,7 @@ const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
   },
   rnd: {
     src: "/art/room-rnd.jpg",
+    city: "/art/city-room-rnd.jpg",
     spots: [
       { id: "rd-mat", x: 9, y: 48 },
       { id: "rd-plm", x: 20, y: 42 },
@@ -108,6 +124,7 @@ const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
   },
   procurement: {
     src: "/art/room-procurement.jpg",
+    city: "/art/city-room-procurement.jpg",
     spots: [
       { id: "pr-op", x: 16, y: 52 },
       { id: "pr-src", x: 46, y: 46 },
@@ -118,6 +135,7 @@ const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
   },
   supply: {
     src: "/art/room-supply.jpg",
+    city: "/art/city-room-supply.jpg",
     spots: [
       { id: "sc-im", x: 18, y: 46 },
       { id: "sc-ewm", x: 48, y: 48 },
@@ -128,6 +146,7 @@ const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
   },
   manufacturing: {
     src: "/art/room-manufacturing.jpg",
+    city: "/art/city-room-manufacturing.jpg",
     spots: [
       { id: "pp-eng", x: 16, y: 34 },
       { id: "pp-mrp", x: 22, y: 64 },
@@ -139,6 +158,7 @@ const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
   },
   sales: {
     src: "/art/room-sales.jpg",
+    city: "/art/city-room-sales.jpg",
     spots: [
       { id: "sd-so", x: 16, y: 50 },
       { id: "sd-pr", x: 48, y: 40 },
@@ -149,6 +169,7 @@ const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
   },
   service: {
     src: "/art/room-service.jpg",
+    city: "/art/city-room-service.jpg",
     spots: [
       { id: "sv-ord", x: 18, y: 55 },
       { id: "sv-ih", x: 48, y: 50 },
@@ -157,6 +178,7 @@ const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
   },
   asset: {
     src: "/art/room-asset.jpg",
+    city: "/art/city-room-asset.jpg",
     spots: [
       { id: "am-req", x: 16, y: 46 },
       { id: "am-pm", x: 50, y: 55 },
@@ -165,6 +187,7 @@ const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
   },
   hr: {
     src: "/art/room-hr.jpg",
+    city: "/art/city-room-hr.jpg",
     spots: [
       { id: "hr-core", x: 16, y: 50 },
       { id: "hr-time", x: 46, y: 52 },
@@ -174,6 +197,7 @@ const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
   },
   project: {
     src: "/art/room-project.jpg",
+    city: "/art/city-room-project.jpg",
     spots: [
       { id: "ps-plan", x: 18, y: 46 },
       { id: "ps-fin", x: 50, y: 50 },
@@ -486,7 +510,7 @@ export function CityMap() {
         onPointerCancel={onPointerUp}
       >
         <img
-          src={room ? room.src : layout === "city" ? "/art/city-map.jpg" : "/art/campus-map.jpg"}
+          src={room ? (layout === "city" ? room.city : room.src) : layout === "city" ? "/art/city-map.jpg" : "/art/campus-map.jpg"}
           alt={wing ? `${wing.name} interior` : "Illustrated neighborhood of the S/4HANA campus"}
           draggable={false}
           width={worldW}
@@ -530,7 +554,7 @@ export function CityMap() {
 
         {!inside &&
           masterTrees.map((tree) => {
-            const spot = layout === "city" ? CITY_TREES[tree.id] : undefined;
+            const spot = (layout === "city" ? CITY_BEACONS : VILLAGE_TREES)[tree.id];
             const pos = toScreen(((spot?.cx ?? tree.cx) / 100) * MAP_W, ((spot?.cy ?? tree.cy) / 100) * MAP_H);
             const hot = treeHover === tree.id || masterId === tree.id;
             return (
@@ -541,6 +565,7 @@ export function CityMap() {
                 scale={cam.s}
                 sign={tree.sign}
                 hot={hot}
+                variant={layout === "city" ? "beacon" : "tree"}
                 onOpen={() => {
                   setTreeHover(null);
                   setHover(null);

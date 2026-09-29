@@ -1,6 +1,8 @@
-/** Drawn height on the campus map, in map pixels. Sprite is 436×520. */
-const TREE_H = 118;
+/** Drawn height on the campus map, in map pixels. */
+const TREE_H = 74;
 const TREE_W = TREE_H * (436 / 520);
+const BEACON_H = 78;
+const BEACON_W = BEACON_H * (80 / 150);
 
 type AppleTreeProps = {
   left: number;
@@ -8,24 +10,25 @@ type AppleTreeProps = {
   scale: number;
   sign: string;
   hot: boolean;
+  variant?: "tree" | "beacon";
   onOpen: () => void;
   onHover: () => void;
   onLeave: () => void;
 };
 
-export function AppleTree({ left, top, scale, sign, hot, onOpen, onHover, onLeave }: AppleTreeProps) {
-  const width = TREE_W * scale;
-  const height = TREE_H * scale;
+export function AppleTree({ left, top, scale, sign, hot, variant = "tree", onOpen, onHover, onLeave }: AppleTreeProps) {
+  const width = (variant === "beacon" ? BEACON_W : TREE_W) * scale;
+  const height = (variant === "beacon" ? BEACON_H : TREE_H) * scale;
   return (
     <button
       type="button"
-      className="absolute z-[15] overflow-visible"
+      className="absolute z-[12] overflow-visible"
       style={{
         left,
         top,
         width,
         height,
-        transform: "translate(-50%, -92%)",
+        transform: "translate(-50%, -100%)",
       }}
       aria-label={`${sign}. Master data.`}
       onPointerDown={(event) => event.stopPropagation()}
@@ -36,22 +39,30 @@ export function AppleTree({ left, top, scale, sign, hot, onOpen, onHover, onLeav
       onPointerEnter={onHover}
       onPointerLeave={onLeave}
     >
-      <img
-        src={hot ? "/art/apple-tree-hot.png" : "/art/apple-tree.png"}
-        alt=""
-        draggable={false}
-        className="h-full w-full object-contain drop-shadow-[0_1px_0_rgba(70,55,30,0.15)]"
-      />
-      {hot && (
-        <span className="pointer-events-none absolute top-0 left-1/2 z-10 flex -translate-x-1/2 -translate-y-[70%] flex-col items-center">
-          <span className="rounded-full bg-paper-2/95 px-2 py-0.5 text-center text-[11px] leading-tight font-bold whitespace-nowrap text-ink shadow-sm">
+      {variant === "beacon" ? (
+        <img src="/art/neon-beacon.svg" alt="" draggable={false} className={`h-full w-full object-contain ${hot ? "brightness-125" : ""}`} />
+      ) : (
+        <img
+          src={hot ? "/art/apple-tree-hot.png" : "/art/apple-tree.png"}
+          alt=""
+          draggable={false}
+          className="h-full w-full object-contain"
+        />
+      )}
+      <span className="pointer-events-none absolute top-full left-1/2 z-10 mt-0.5 flex -translate-x-1/2 flex-col items-center">
+        <span
+          className={`max-w-36 rounded-full px-2 py-0.5 text-center text-[11px] leading-tight font-bold ${
+            variant === "beacon" ? "bg-[#1b1224]/90 text-[#f6e7ff]" : "bg-paper-2/95 text-ink"
+          }`}
+        >
+          {sign}
+        </span>
+        {hot && (
+          <span className="mt-0.5 rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold whitespace-nowrap text-paper">
             Master data
           </span>
-          <span className="mt-0.5 max-w-40 rounded-full bg-ink/90 px-2 py-0.5 text-center text-[10px] leading-tight font-semibold text-paper">
-            {sign}
-          </span>
-        </span>
-      )}
+        )}
+      </span>
     </button>
   );
 }
