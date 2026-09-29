@@ -124,7 +124,7 @@ export const wings: Wing[] = [
         fiori: "Post Incoming Payments",
         tcode: "F-28 · FB70 · BP",
         versusEcc:
-          "FD32 classic credit management and XD01 as the customer master are not the target. One business partner can be both customer and supplier.",
+          "In ECC a customer was a separate master (XD01) and credit often lived on the old credit master (FD32). In S/4HANA the customer is a business partner, and one partner can be both customer and supplier. Billing creates the finance document; you do not retype it. Incoming payments clear those open items. Credit is SAP Credit Management on the business partner.",
         flag: "The Fiori name Post Incoming Payments is stable; confirm the current app ID in the Fiori apps reference library for 2025 FPS01 before you put it on a training slide.",
       },
       {
@@ -191,13 +191,29 @@ export const wings: Wing[] = [
   {
     id: "rnd",
     place: "The atelier",
-    name: "R&D and engineering",
+    name: "Research and development (R&D) and engineering",
     art: "/art/rnd.jpg",
     accent: "rnd",
     fsd: "Product structure, change control, and product compliance inside Enterprise Management. Confirm the exact 2025 chapter headings in the Feature Scope Description when you map licenses.",
     blurb:
-      "Nothing should be planned or procured until engineering has a bill of material and a change record the plant is allowed to build.",
+      "The product master comes first. Nothing should be planned or procured until that material has a bill of material and a change record the plant is allowed to build.",
     stations: [
+      {
+        id: "rd-mat",
+        title: "Material master",
+        area: "Product master",
+        body: "A material is the product you buy, make, store, and sell. The material type decides which views exist. Basic data is shared across the company. Plant data holds planning and procurement. Sales data holds the sales area. Valuation holds the price and the valuation class. Because the material ledger is always on, a valuated stock movement posts inventory value as a journal line.",
+        system: [
+          "Material type — raw material, semi-finished, finished good, or trading good",
+          "Views — basic data, purchasing, sales, MRP, accounting, and storage",
+          "MM01 create · MM02 change",
+        ],
+        fiori: "Manage Product Master Data",
+        appId: "F1602",
+        tcode: "MM01 · MM02",
+        versusEcc:
+          "You still create a material, and MM01 is still that transaction. What changed is around it. The usual place to maintain the product is Manage Product Master Data. The material ledger is mandatory, so a valuated material is not held at a statistical price outside the journal. The same material carries the views the other buildings use: purchasing, sales, planning, and valuation. It is not a business partner.",
+      },
       {
         id: "rd-plm",
         title: "Change control",
@@ -212,7 +228,7 @@ export const wings: Wing[] = [
         tcode: "CC01 · CV01N",
         versusEcc:
           "ECC lived on the change master (AENNR) alone. S/4HANA adds the change record as the object that can carry impact analysis and a release decision into manufacturing.",
-        flag: "Confirm the Manage Change Records app ID for 2025 FPS01 in the Fiori library. Portfolio-level R&D projects are a different object — see the Project System wing.",
+        flag: "Confirm the Manage Change Records app ID for 2025 FPS01 in the Fiori library. Portfolio-level research and development (R&D) projects are a different object — see the Project System wing.",
       },
       {
         id: "rd-bom",
@@ -284,6 +300,8 @@ export const wings: Wing[] = [
         ],
         fiori: "Manage Purchase Contracts",
         tcode: "ME31K · ME11 · ME41",
+        versusEcc:
+          "Quantity contracts, value contracts, info records, and requests for quotation are the same sourcing tools as in ECC. A call-off still creates a purchase order that consumes the open quantity or value. The supplier on the agreement is a business partner, not a vendor master created with XK01.",
         flag: "Confirm the Manage Purchase Contracts app ID for 2025 FPS01. ME31K remains the classic create transaction.",
       },
       {
@@ -417,7 +435,7 @@ export const wings: Wing[] = [
         tcode: "CO09 for the availability overview",
         versusEcc:
           "ECC ATP was the check inside the sales order (CO09). S/4HANA aATP adds allocation, protection, and backorder processing as first-class supply-chain functions, some of them licensed separately from a basic check.",
-        fps: "2025 FPS01 What’s New notes, shared by on-premise and Cloud Private Edition, describe cut-off times on the product availability check so a receipt planned after a time of day counts as the next day. Confirm the note in the What’s New viewer before you teach it as already configured.",
+        fps: "2025 FPS01 What’s New notes, shared by on-premise and Cloud Private Edition, describe cut-off times on the product availability check so a receipt planned after a time of day counts as the next day. Confirm the note in the What’s New viewer before you treat the cut-off as already configured.",
         flag: "Product allocation, supply protection, and alternative-based confirmation are advanced ATP scope. Do not describe them as free with every core install, and do not use Cloud Public Edition scope-item codes.",
       },
     ],
@@ -549,7 +567,7 @@ export const wings: Wing[] = [
         appId: "F1873",
         tcode: "VA01 · VA02",
         versusEcc:
-          "The order looks like ECC. Master data is the business partner, and the availability check can be advanced ATP rather than classic ATP only.",
+          "The document shape is the one you already know from ECC: a document type, an item category, and a schedule line that carries the confirmed quantity and date. The parties are different. Sold-to, ship-to, and bill-to are roles of a business partner, not a customer master created with XD01. Overall processing, delivery, and billing status used to live in separate status records beside the order; in S/4HANA they belong to the order itself, so you read them with the document. The availability check can be advanced ATP — allocation, supply protection, and backorder processing — rather than only the classic check. Credit is SAP Credit Management on the business partner, not the old FD32 credit master.",
       },
       {
         id: "sd-pr",
@@ -563,6 +581,8 @@ export const wings: Wing[] = [
         ],
         fiori: "Manage Prices — Sales",
         tcode: "VK11 · VK12",
+        versusEcc:
+          "The condition technique is the same idea as in ECC: a pricing procedure, condition types such as the base price, and condition records for a customer, a material, or a price list. In ECC the calculated price was stored beside the order. In S/4HANA it is part of the sales document, so the price on the order is the price that posts. The customer used in pricing is a business partner.",
         flag: "Confirm the Manage Prices — Sales app ID for 2025 FPS01. Procedure and condition-type names are configuration; PR00 and RVAA01 are the delivered examples to teach, not a promise about a given client.",
       },
       {
@@ -577,6 +597,8 @@ export const wings: Wing[] = [
         ],
         fiori: "Create Billing Documents · Manage Billing Documents",
         tcode: "VF01 · VF02",
+        versusEcc:
+          "A delivery-related invoice and a credit memo are the same business documents as in ECC. The invoice creates accounting lines in the Universal Journal directly; you do not type a second customer invoice in finance. Header status sits on the billing document. Billing items do not keep a separate status record the way they did in ECC.",
         flag: "Confirm Fiori app IDs for 2025 FPS01 (Manage Billing Documents has carried F0797 for a long time — recheck before you publish a poster).",
       },
       {
@@ -591,6 +613,8 @@ export const wings: Wing[] = [
         ],
         fiori: "Manage Sales Contracts",
         tcode: "VA41 · VA42",
+        versusEcc:
+          "A quantity contract and a value contract work as they did in ECC. A release order, which is a sales order with reference, consumes the open quantity or the open value. The contract itself is not delivered. The customer on the contract is a business partner, and the release order follows the same status and pricing rules as any other sales order.",
         flag: "Confirm the Manage Sales Contracts app ID for 2025 FPS01. WK2 exists as a material-related value contract in many clients.",
       },
       {
@@ -635,7 +659,7 @@ export const wings: Wing[] = [
         tcode: "Run this process in the service Fiori apps",
         versusEcc:
           "Classic CS (service notifications and CS orders on the PM engine) is the compatibility-era process. New designs use S/4HANA Service.",
-        fps: "2025 What’s New for on-premise and private edition extends EBRR on service documents (including cost-based percentage of completion and completed contract, depending on billing relevance). Read the service revenue note before teaching one method as universal.",
+        fps: "2025 What’s New for on-premise and private edition extends EBRR on service documents (including cost-based percentage of completion and completed contract, depending on billing relevance). Read the service revenue note before treating one method as the only one.",
         flag: "Confirm Manage Service Orders app ID for 2025 FPS01. There is often no VA01-style transaction for the new service order — do not invent one.",
       },
       {

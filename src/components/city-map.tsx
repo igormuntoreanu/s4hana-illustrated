@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, Minus, Plus, X } from "lucide-react";
+import { ArrowLeft, Check, Minus, Plus, X } from "lucide-react";
 import {
   EDITION,
   bridges,
@@ -11,6 +11,13 @@ import {
   type Station,
   type Wing,
 } from "@/data/guide";
+import { studyObjects } from "@/data/study-objects";
+import { technicalModels } from "@/data/technical-model";
+import { StudyObjectPage } from "@/components/study-object";
+import { TechnicalModelCard } from "@/components/technical-model";
+import { AppleTree } from "@/components/apple-tree";
+import { MasterDataPanel } from "@/components/master-data-panel";
+import { masterTrees } from "@/data/master-trees";
 import { useProgress } from "@/state/progress";
 
 const MAP_W = 2128;
@@ -26,7 +33,7 @@ type Spot = { id: string; x: number; y: number };
 
 const SHORT: Record<string, string> = {
   finance: "Finance",
-  rnd: "R&D",
+  rnd: "Research and development (R&D)",
   procurement: "Procurement",
   supply: "Supply chain",
   manufacturing: "Manufacturing",
@@ -46,7 +53,7 @@ const PLOTS: Plot[] = [
   { id: "manufacturing", cx: 66, cy: 58, w: 16, h: 18 },
   { id: "asset", cx: 40, cy: 70, w: 14, h: 14 },
   { id: "service", cx: 79, cy: 72, w: 14, h: 16 },
-  { id: "project", cx: 46, cy: 82, w: 16, h: 14 },
+  { id: "project", cx: 14, cy: 76, w: 13, h: 16 },
 ];
 
 const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
@@ -66,6 +73,7 @@ const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
   rnd: {
     src: "/art/room-rnd.jpg",
     spots: [
+      { id: "rd-mat", x: 9, y: 48 },
       { id: "rd-plm", x: 20, y: 42 },
       { id: "rd-bom", x: 50, y: 58 },
       { id: "rd-comp", x: 82, y: 40 },
@@ -173,6 +181,8 @@ export function CityMap() {
   const [inside, setInside] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [station, setStation] = useState<Station | null>(null);
+  const [masterId, setMasterId] = useState<string | null>(null);
+  const [treeHover, setTreeHover] = useState<string | null>(null);
   const [bridgeId, setBridgeId] = useState<string | null>(null);
   const [directory, setDirectory] = useState(false);
   const [sources, setSources] = useState(false);
@@ -490,6 +500,29 @@ export function CityMap() {
         )}
 
         {!inside &&
+          masterTrees.map((tree) => {
+            const pos = toScreen((tree.cx / 100) * MAP_W, (tree.cy / 100) * MAP_H);
+            const hot = treeHover === tree.id || masterId === tree.id;
+            return (
+              <AppleTree
+                key={tree.id}
+                left={pos.left}
+                top={pos.top}
+                scale={cam.s}
+                sign={tree.sign}
+                hot={hot}
+                onOpen={() => {
+                  setTreeHover(null);
+                  setHover(null);
+                  setMasterId(tree.id);
+                }}
+                onHover={() => setTreeHover(tree.id)}
+                onLeave={() => setTreeHover((cur) => (cur === tree.id ? null : cur))}
+              />
+            );
+          })}
+
+        {!inside &&
           PLOTS.map((plot) => {
             const c = plotCenter(plot);
             const pos = toScreen(c.x, c.y);
@@ -502,7 +535,7 @@ export function CityMap() {
               <button
                 key={plot.id}
                 type="button"
-                className="absolute z-10"
+                className="absolute z-20"
                 style={{ left: pos.left, top: pos.top, transform: "translate(-50%, -50%)" }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -515,7 +548,7 @@ export function CityMap() {
                     className={`size-3 rounded-full ring-2 ring-paper ${onBridge || hot ? "bg-stamp" : "bg-ink"}`}
                   />
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                    className={`max-w-40 rounded-full px-2 py-0.5 text-center text-xs leading-tight font-bold ${
                       onBridge ? "bg-stamp text-paper" : "bg-paper-2/95 text-ink"
                     }`}
                   >
@@ -544,6 +577,7 @@ export function CityMap() {
                 onPointerLeave={() => setHover((h) => (h === st.id ? null : h))}
                 onClick={(e) => {
                   e.stopPropagation();
+                  setHover(null);
                   setStation(st);
                 }}
                 aria-label={st.title}
@@ -568,16 +602,29 @@ export function CityMap() {
       </div>
 
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-3">
-        <div className="pointer-events-auto max-w-[70%] rounded-2xl border border-line bg-paper-2/95 px-3 py-2">
-          <p className="text-xs font-bold tracking-widest text-stamp uppercase">
-            {inside ? wing?.place : "Neighborhood"}
-          </p>
-          <h1 className="text-lg leading-tight font-semibold">{inside ? wing?.name : "S/4HANA Illustrated"}</h1>
-          <p className="text-xs text-muted tabular-nums">
-            {inside
-              ? "Zoom out or step back to the lane"
-              : `${stampedCount(read)}/${wings.length} stamped · drag, pinch, scroll`}
-          </p>
+        <div className="pointer-events-auto flex max-w-[78%] items-start gap-2">
+          {inside && (
+            <button
+              type="button"
+              onClick={leave}
+              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-ink px-3 text-sm font-bold text-paper"
+              aria-label="Back to the map"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              Back
+            </button>
+          )}
+          <div className="min-w-0 rounded-2xl border border-line bg-paper-2/95 px-3 py-2">
+            <p className="text-xs font-bold tracking-widest text-stamp uppercase">
+              {inside ? wing?.place : "Neighborhood"}
+            </p>
+            <h1 className="text-lg leading-tight font-semibold">{inside ? wing?.name : "S/4HANA Illustrated"}</h1>
+            <p className="text-xs text-muted tabular-nums">
+              {inside
+                ? "Tap a numbered station"
+                : `${stampedCount(read)}/${wings.length} stamped · drag, pinch, scroll`}
+            </p>
+          </div>
         </div>
         <div className="pointer-events-auto flex flex-col gap-2">
           <button type="button" aria-label="Zoom in" className="grid size-11 place-items-center rounded-full border border-line bg-paper-2" onClick={() => zoomAt(vw / 2, vh / 2, 1.2)}>
@@ -586,11 +633,7 @@ export function CityMap() {
           <button type="button" aria-label="Zoom out" className="grid size-11 place-items-center rounded-full border border-line bg-paper-2" onClick={() => zoomAt(vw / 2, vh / 2, 1 / 1.2)}>
             <Minus className="size-5" />
           </button>
-          {inside ? (
-            <button type="button" className="min-h-11 rounded-full bg-ink px-3 text-sm font-bold text-paper" onClick={leave}>
-              Lane
-            </button>
-          ) : (
+          {!inside && (
             <button
               type="button"
               className="min-h-11 rounded-full bg-ink px-3 text-sm font-bold text-paper"
@@ -612,26 +655,37 @@ export function CityMap() {
             <p className="text-xs leading-snug text-muted">{wingById(hover)?.blurb}</p>
           </div>
         )}
-        <div className="pointer-events-auto flex gap-2 overflow-x-auto">
-          <button type="button" className="shrink-0 rounded-full border border-line bg-paper-2 px-3 py-2 text-sm font-bold" onClick={() => setDirectory(true)}>
-            Directory
+        {inside ? (
+          <button
+            type="button"
+            onClick={leave}
+            className="pointer-events-auto inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-ink px-4 text-base font-bold text-paper"
+          >
+            <ArrowLeft className="size-5" aria-hidden="true" />
+            Back to map
           </button>
-          <button type="button" className="shrink-0 rounded-full border border-line bg-paper-2 px-3 py-2 text-sm font-bold" onClick={() => setSources(true)}>
-            Edition
-          </button>
-          {bridges.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              onClick={() => setBridgeId((cur) => (cur === b.id ? null : b.id))}
-              className={`shrink-0 rounded-full px-3 py-2 text-sm font-bold ${
-                bridgeId === b.id ? "bg-stamp text-paper" : "border border-line bg-paper-2"
-              }`}
-            >
-              {b.name}
+        ) : (
+          <div className="pointer-events-auto flex gap-2 overflow-x-auto">
+            <button type="button" className="shrink-0 rounded-full border border-line bg-paper-2 px-3 py-2 text-sm font-bold" onClick={() => setDirectory(true)}>
+              Directory
             </button>
-          ))}
-        </div>
+            <button type="button" className="shrink-0 rounded-full border border-line bg-paper-2 px-3 py-2 text-sm font-bold" onClick={() => setSources(true)}>
+              Edition
+            </button>
+            {bridges.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => setBridgeId((cur) => (cur === b.id ? null : b.id))}
+                className={`shrink-0 rounded-full px-3 py-2 text-sm font-bold ${
+                  bridgeId === b.id ? "bg-stamp text-paper" : "border border-line bg-paper-2"
+                }`}
+              >
+                {b.name}
+              </button>
+            ))}
+          </div>
+        )}
       </footer>
 
       <Directory
@@ -655,6 +709,7 @@ export function CityMap() {
         onClose={() => setStation(null)}
         onMark={(id) => mark(id)}
       />
+      <MasterDataPanel key={masterId ?? "closed"} treeId={masterId} onClose={() => setMasterId(null)} />
     </div>
   );
 }
@@ -722,11 +777,13 @@ function StationSheet({
   onMark: (id: string) => void;
 }) {
   const seen = station ? read.includes(station.id) : false;
+  const sample = station ? studyObjects[station.id] : undefined;
+  const technical = station ? technicalModels[station.id] : undefined;
   return (
     <Dialog.Root open={Boolean(station)} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-30 bg-ink/40" />
-        <Dialog.Content className="fixed inset-x-0 bottom-0 z-40 max-h-dvh overflow-y-auto rounded-t-3xl bg-paper-2 px-5 pt-4 pb-8 sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl">
+        <Dialog.Content className="fixed inset-x-0 bottom-0 z-40 max-h-dvh overflow-y-auto rounded-t-3xl bg-paper-2 px-5 pt-4 pb-8 sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:max-w-3xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl">
           {station && (
             <>
               <div className="flex items-start justify-between gap-3">
@@ -766,16 +823,12 @@ function StationSheet({
                   <p className="mt-1 text-sm leading-relaxed">{station.versusEcc}</p>
                 </aside>
               )}
+              {sample && <StudyObjectPage page={sample} />}
+              {technical && <TechnicalModelCard model={technical} />}
               {station.fps && (
                 <aside className="mt-3 rounded-2xl border border-line bg-paper p-3">
                   <h3 className="text-xs font-bold tracking-widest text-stamp uppercase">2025 FPS01</h3>
                   <p className="mt-1 text-sm leading-relaxed">{station.fps}</p>
-                </aside>
-              )}
-              {station.flag && (
-                <aside className="mt-3 rounded-2xl border border-stamp bg-paper p-3">
-                  <h3 className="text-xs font-bold tracking-widest text-stamp uppercase">Check before you teach it</h3>
-                  <p className="mt-1 text-sm leading-relaxed">{station.flag}</p>
                 </aside>
               )}
               <button
