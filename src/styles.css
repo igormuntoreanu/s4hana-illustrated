@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #f4efe4;
+  --color-paper-2: #fffaf3;
+  --color-ink: #1a2744;
+  --color-muted: #5c6b86;
+  --color-stamp: #c4321a;
+  --color-line: #e0d6c6;
+  --color-path: #e0a84a;
+  --color-finance: #0f6e56;
+  --color-rnd: #3d4ec4;
+  --color-procurement: #c9841a;
+  --color-supply: #0e7c8a;
+  --color-manufacturing: #e15a1c;
+  --color-sales: #d94b62;
+  --color-service: #3d6bdb;
+  --color-asset: #3e4c63;
+  --color-hr: #c65b3a;
+  --color-project: #8a5a2a;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-sans: "Nunito Sans", "Segoe UI", sans-serif;
+  --radius-plate: 1.25rem;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background: var(--color-paper);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-stamp);
+    outline-offset: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
