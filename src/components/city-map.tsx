@@ -43,7 +43,7 @@ const SHORT: Record<string, string> = {
   hr: "People",
   project: "Projects",
 };
-const PLOTS: Plot[] = [
+const VILLAGE_PLOTS: Plot[] = [
   { id: "rnd", cx: 22, cy: 10, w: 14, h: 16 },
   { id: "finance", cx: 50, cy: 13, w: 16, h: 16 },
   { id: "hr", cx: 74, cy: 13, w: 14, h: 16 },
@@ -55,6 +55,33 @@ const PLOTS: Plot[] = [
   { id: "service", cx: 79, cy: 72, w: 14, h: 16 },
   { id: "project", cx: 14, cy: 76, w: 13, h: 16 },
 ];
+
+/** Same stations, placed on the industrial city drawing. */
+const CITY_PLOTS: Plot[] = [
+  { id: "rnd", cx: 19, cy: 18, w: 18, h: 18 },
+  { id: "finance", cx: 51, cy: 16, w: 16, h: 18 },
+  { id: "hr", cx: 80, cy: 16, w: 14, h: 18 },
+  { id: "procurement", cx: 36, cy: 38, w: 16, h: 16 },
+  { id: "sales", cx: 63, cy: 40, w: 14, h: 16 },
+  { id: "supply", cx: 24, cy: 54, w: 18, h: 16 },
+  { id: "manufacturing", cx: 73, cy: 58, w: 16, h: 16 },
+  { id: "asset", cx: 43, cy: 63, w: 12, h: 14 },
+  { id: "service", cx: 87, cy: 70, w: 14, h: 16 },
+  { id: "project", cx: 11, cy: 76, w: 14, h: 16 },
+];
+
+const CITY_TREES: Record<string, { cx: number; cy: number }> = {
+  rnd: { cx: 31, cy: 24 },
+  finance: { cx: 40, cy: 22 },
+  people: { cx: 70, cy: 22 },
+  procurement: { cx: 27, cy: 42 },
+  sales: { cx: 73, cy: 44 },
+  supply: { cx: 14, cy: 58 },
+  mfg: { cx: 62, cy: 64 },
+  maint: { cx: 35, cy: 68 },
+  service: { cx: 78, cy: 76 },
+  project: { cx: 20, cy: 84 },
+};
 
 const ROOMS: Record<string, { src: string; spots: Spot[] }> = {
   finance: {
@@ -173,6 +200,8 @@ function clampCam(c: Cam, vw: number, vh: number, w: number, h: number, minS: nu
 export function CityMap() {
   const read = useProgress((s) => s.read);
   const mark = useProgress((s) => s.mark);
+  const [layout, setLayout] = useState<"village" | "city">("village");
+  const plots = layout === "city" ? CITY_PLOTS : VILLAGE_PLOTS;
   const frame = useRef<HTMLDivElement>(null);
   const camRef = useRef<Cam>({ x: MAP_W / 2, y: MAP_H / 2, s: 0.4 });
   const [cam, setCam] = useState<Cam>(camRef.current);
@@ -293,7 +322,7 @@ export function CityMap() {
     const px = (mx / MAP_W) * 100;
     const py = (my / MAP_H) * 100;
     return (
-      PLOTS.find(
+      plots.find(
         (p) => Math.abs(px - p.cx) <= p.w / 2 && Math.abs(py - p.cy) <= p.h / 2,
       ) ?? null
     );
@@ -301,7 +330,7 @@ export function CityMap() {
 
   function enter(id: string) {
     if (holdEnter.current || entering.current || inside) return;
-    const plot = PLOTS.find((p) => p.id === id);
+    const plot = plots.find((p) => p.id === id);
     if (!plot) return;
     entering.current = true;
     const c = plotCenter(plot);
@@ -332,7 +361,7 @@ export function CityMap() {
     holdEnter.current = true;
     setInside(null);
     setHover(null);
-    const plot = PLOTS.find((p) => p.id === id);
+    const plot = plots.find((p) => p.id === id);
     const fit = fitScale(vw, vh, MAP_W, MAP_H);
     const c = plot ? plotCenter(plot) : { x: MAP_W / 2, y: MAP_H / 2 };
     const next = clampCam({ x: c.x, y: c.y, s: Math.max(fit, 0.36) }, vw, vh, MAP_W, MAP_H, fit * 0.96, 2.2);
@@ -457,7 +486,7 @@ export function CityMap() {
         onPointerCancel={onPointerUp}
       >
         <img
-          src={room ? room.src : "/art/campus-map.jpg"}
+          src={room ? room.src : layout === "city" ? "/art/city-map.jpg" : "/art/campus-map.jpg"}
           alt={wing ? `${wing.name} interior` : "Illustrated neighborhood of the S/4HANA campus"}
           draggable={false}
           width={worldW}
@@ -489,7 +518,7 @@ export function CityMap() {
               strokeLinecap="round"
               points={bridge.wingIds
                 .map((id) => {
-                  const plot = PLOTS.find((p) => p.id === id);
+                  const plot = plots.find((p) => p.id === id);
                   if (!plot) return "";
                   const c = plotCenter(plot);
                   return `${c.x},${c.y}`;
@@ -501,7 +530,8 @@ export function CityMap() {
 
         {!inside &&
           masterTrees.map((tree) => {
-            const pos = toScreen((tree.cx / 100) * MAP_W, (tree.cy / 100) * MAP_H);
+            const spot = layout === "city" ? CITY_TREES[tree.id] : undefined;
+            const pos = toScreen(((spot?.cx ?? tree.cx) / 100) * MAP_W, ((spot?.cy ?? tree.cy) / 100) * MAP_H);
             const hot = treeHover === tree.id || masterId === tree.id;
             return (
               <AppleTree
@@ -523,7 +553,7 @@ export function CityMap() {
           })}
 
         {!inside &&
-          PLOTS.map((plot) => {
+          plots.map((plot) => {
             const c = plotCenter(plot);
             const pos = toScreen(c.x, c.y);
             const w = wingById(plot.id);
@@ -616,9 +646,35 @@ export function CityMap() {
           )}
           <div className="min-w-0 rounded-2xl border border-line bg-paper-2/95 px-3 py-2">
             <p className="text-xs font-bold tracking-widest text-stamp uppercase">
-              {inside ? wing?.place : "Neighborhood"}
+              {inside ? wing?.place : layout === "city" ? "City" : "Neighborhood"}
             </p>
             <h1 className="text-lg leading-tight font-semibold">{inside ? wing?.name : "S/4HANA Illustrated"}</h1>
+            {!inside && (
+              <div className="mt-2 flex rounded-full border border-line bg-paper p-0.5" role="group" aria-label="Map layout">
+                <button
+                  type="button"
+                  aria-pressed={layout === "village"}
+                  className={`min-h-8 rounded-full px-3 text-xs font-bold ${layout === "village" ? "bg-ink text-paper" : "text-ink"}`}
+                  onClick={() => {
+                    setLayout("village");
+                    setHover(null);
+                  }}
+                >
+                  Village
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={layout === "city"}
+                  className={`min-h-8 rounded-full px-3 text-xs font-bold ${layout === "city" ? "bg-ink text-paper" : "text-ink"}`}
+                  onClick={() => {
+                    setLayout("city");
+                    setHover(null);
+                  }}
+                >
+                  City
+                </button>
+              </div>
+            )}
             <p className="text-xs text-muted tabular-nums">
               {inside
                 ? "Tap a numbered station"
@@ -694,7 +750,7 @@ export function CityMap() {
         onPick={(id) => {
           setDirectory(false);
           if (inside) leave();
-          const plot = PLOTS.find((p) => p.id === id);
+          const plot = plots.find((p) => p.id === id);
           if (!plot) return;
           const c = plotCenter(plot);
           const fit = fitScale(vw, vh, MAP_W, MAP_H);
