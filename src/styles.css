@@ -170,3 +170,58 @@
     scroll-behavior: auto !important;
   }
 }
+
+.motion-off .campus-lights {
+  animation: none;
+  --twinkle: 1;
+}
+
+.village-canvas {
+  position: absolute !important;
+  inset: 0;
+}
+
+/* Soft paper grain and vignette so the 3D village sits with the watercolour interiors. */
+.village-paper {
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 55%, rgb(92 70 40 / 0.22) 100%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.27 0 0 0 0 0.16 0 0 0 0.5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+
+.village-label,
+.village-tree-label {
+  will-change: transform;
+  transition: opacity 180ms ease;
+}
+
+.village-label.is-dim > span:first-child {
+  opacity: 0.6;
+}
+
+.village-tree-label > span {
+  opacity: 0.85;
+}
+
+.village-tree-label.is-hot > span,
+.village-tree-label:focus-visible > span {
+  opacity: 1;
+  background: var(--color-stamp);
+  color: var(--color-paper-2);
+}
+
+.village-hint {
+  animation: village-hint-in 500ms ease-out both;
+}
+
+@keyframes village-hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
