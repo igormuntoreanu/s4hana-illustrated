@@ -12,3 +12,4 @@ screenshots
 .project_id
 .DS_Store
 .node_modules.lock
+qa

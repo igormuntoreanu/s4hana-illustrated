@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, Check, Minus, Plus, X } from "lucide-react";
+import * as Popover from "@radix-ui/react-popover";
+import { ArrowLeft, Check, ChevronDown, Minus, Plus, X } from "lucide-react";
 import {
   EDITION,
   bridges,
@@ -20,6 +21,49 @@ import { MasterDataPanel } from "@/components/master-data-panel";
 import { masterTrees } from "@/data/master-trees";
 import { shelfForWing } from "@/data/books";
 import { useProgress } from "@/state/progress";
+import { useVillage } from "@/components/village3d/store";
+
+const VillageCanvas = lazy(() => import("@/components/village3d/village-canvas"));
+
+type Engine = "pending" | "3d" | "2d";
+
+function hasWebGL() {
+  try {
+    const c = document.createElement("canvas");
+    return Boolean(c.getContext("webgl2") || c.getContext("webgl"));
+  } catch {
+    return false;
+  }
+}
+
+function pickEngine(): Engine {
+  const forced = new URLSearchParams(window.location.search).get("view");
+  if (forced === "2d") return "2d";
+  if (!hasWebGL()) return "2d";
+  if (forced === "3d") return "3d";
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "2d" : "3d";
+}
+
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw === null ? fallback : (JSON.parse(raw) as T);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJson(key: string, value: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage may be unavailable */
+  }
+}
+
+const HINT_KEY = "s4-village-hint-seen";
+const CELEBRATED_KEY = "s4-village-celebrated";
+const MOTION_KEY = "s4-reduce-motion";
 
 const MAP_W = 2128;
 const MAP_H = 912;
@@ -286,9 +330,22 @@ export function CityMap() {
   const pinch = useRef<{ d: number; s: number } | null>(null);
   const raf = useRef(0);
   const anim = useRef(0);
-  const holdEnter = useRef(false);
   const booted = useRef(false);
-  const entering = useRef(false);
+  const [engine, setEngine] = useState<Engine>("pending");
+  const [boot3d, setBoot3d] = useState({ done: 0, total: 1, label: "Loading the engine" });
+  const [ready3d, setReady3d] = useState(false);
+  const [hint, setHint] = useState(false);
+  const [coarse, setCoarse] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [celebrate, setCelebrate] = useState<string | null>(null);
+  const [insets, setInsets] = useState({ top: 120, bottom: 64 });
+  const headerRef = useRef<HTMLElement>(null);
+  const footerRef = useRef<HTMLElement>(null);
+  const backRef = useRef<HTMLButtonElement>(null);
+  const lastBuilding = useRef<string | null>(null);
+  const gliding = useVillage((s) => s.gliding);
+  const village3d = (engine === "3d" || engine === "pending") && layout === "village";
+  const hide2d = village3d && !inside;
 
   const worldW = inside ? ROOM_W : MAP_W;
   const worldH = inside ? ROOM_H : MAP_H;
@@ -396,6 +453,8 @@ export function CityMap() {
 
   function enter(id: string) {
     if (!ROOMS[id]) return;
+    lastBuilding.current = id;
+    requestAnimationFrame(() => backRef.current?.focus({ preventScroll: true }));
     setHover(null);
     setStation(null);
     setInside(id);
@@ -407,10 +466,21 @@ export function CityMap() {
   }
 
   function leave() {
+    const from = inside ?? lastBuilding.current;
     setInside(null);
     setHover(null);
     setStation(null);
     setHelp(false);
+    if (village3d) {
+      requestAnimationFrame(() => {
+        void useVillage.getState().camera?.glideOut();
+      });
+    }
+    if (from) {
+      window.setTimeout(() => {
+        document.querySelector<HTMLElement>(`[data-building="${from}"]`)?.focus({ preventScroll: true });
+      }, 60);
+    }
     const fit = fitScale(vw, vh, MAP_W, MAP_H);
     const next = clampCam({ x: MAP_W / 2, y: MAP_H / 2, s: Math.max(fit, 0.36) }, vw, vh, MAP_W, MAP_H, fit * 0.96, 2.2);
     camRef.current = next;
@@ -505,7 +575,7 @@ export function CityMap() {
       ? "/art/city-map.jpg"
       : "/art/campus-map.jpg?v=4";
   const sceneReady = loadedSrc === sceneSrc;
-  const mapReady = sceneReady && !bootHold;
+  const mapReady = sceneReady && !bootHold && !hide2d;
 
   useEffect(() => {
     if (inside) return;
@@ -515,6 +585,7 @@ export function CityMap() {
   }, [sceneSrc, inside]);
 
   useEffect(() => {
+    if (engine !== "2d") return;
     const urls = [
       "/art/campus-map.jpg?v=4",
       "/art/city-map.jpg",
@@ -524,7 +595,127 @@ export function CityMap() {
       const img = new Image();
       img.src = url;
     }
+  }, [engine]);
+
+  useEffect(() => {
+    setEngine(pickEngine());
+    setHint(!readJson(HINT_KEY, false));
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduceMotion(readJson(MOTION_KEY, motion.matches));
+    const pointer = window.matchMedia("(pointer: coarse)");
+    setCoarse(pointer.matches);
+    const onMotion = () => setEngine(pickEngine());
+    motion.addEventListener("change", onMotion);
+    return () => motion.removeEventListener("change", onMotion);
   }, []);
+
+  useEffect(() => {
+    useVillage.getState().setReduced(reduceMotion);
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    useVillage.getState().setRoute(bridgeId);
+  }, [bridgeId]);
+
+  useEffect(() => {
+    const measure = () => {
+      const h = headerRef.current?.getBoundingClientRect();
+      const f = footerRef.current?.getBoundingClientRect();
+      const top = h ? Math.max(0, ...[...headerRef.current!.querySelectorAll<HTMLElement>(":scope > div")].map((el) => el.getBoundingClientRect().bottom)) : 120;
+      const bottom = f ? window.innerHeight - Math.min(...[...footerRef.current!.children].map((el) => el.getBoundingClientRect().top), window.innerHeight) : 64;
+      setInsets((cur) => (Math.abs(cur.top - top) < 2 && Math.abs(cur.bottom - bottom) < 2 ? cur : { top, bottom }));
+    };
+    measure();
+    const obs = new ResizeObserver(measure);
+    if (headerRef.current) obs.observe(headerRef.current);
+    if (footerRef.current) obs.observe(footerRef.current);
+    window.addEventListener("resize", measure);
+    return () => {
+      obs.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [inside, layout, bridgeId]);
+
+  const dismissHint = useCallback(() => {
+    setHint((cur) => {
+      if (cur) writeJson(HINT_KEY, true);
+      return false;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!hint) return;
+    const off = () => dismissHint();
+    window.addEventListener("pointerdown", off, { once: true });
+    window.addEventListener("keydown", off, { once: true });
+    window.addEventListener("wheel", off, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", off);
+      window.removeEventListener("keydown", off);
+      window.removeEventListener("wheel", off);
+    };
+  }, [hint, dismissHint]);
+
+  useEffect(() => {
+    if (!bridgeId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || document.querySelector("[role=dialog]")) return;
+      setBridgeId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [bridgeId]);
+
+  // A building that became stamped since the last visit celebrates once, outside, after the glide back.
+  useEffect(() => {
+    if (engine !== "3d" || layout !== "village" || !ready3d || inside || gliding || celebrate) return;
+    const stamped = wings.filter((w) => isWingComplete(w, read)).map((w) => w.id);
+    const seen = readJson<string[] | null>(CELEBRATED_KEY, null);
+    if (seen === null) {
+      writeJson(CELEBRATED_KEY, stamped);
+      return;
+    }
+    const fresh = stamped.find((id) => !seen.includes(id));
+    if (!fresh) return;
+    writeJson(CELEBRATED_KEY, [...seen, fresh]);
+    setCelebrate(fresh);
+  }, [engine, layout, ready3d, inside, gliding, read, celebrate]);
+
+  useEffect(() => {
+    if (!celebrate) return;
+    useVillage.getState().setCelebrate(celebrate);
+    const end = window.setTimeout(() => {
+      setCelebrate(null);
+      useVillage.getState().setCelebrate(null);
+    }, 3600);
+    return () => window.clearTimeout(end);
+  }, [celebrate]);
+
+  const preloadRoom = (id: string) => {
+    const room = ROOMS[id];
+    if (!room) return;
+    const img = new Image();
+    img.src = `${layout === "city" ? room.city : room.src}?v=7`;
+  };
+
+  const hover3d = useVillage((s) => s.hover);
+  useEffect(() => {
+    if (hover3d) preloadRoom(hover3d);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hover3d]);
+
+  async function select3d(id: string) {
+    const st = useVillage.getState();
+    if (st.gliding || inside) return;
+    dismissHint();
+    preloadRoom(id);
+    lastBuilding.current = id;
+    st.setHover(null);
+    await st.camera?.glideIn(id);
+    enter(id);
+  }
+
+  const camera3d = () => (village3d && !inside ? useVillage.getState().camera : null);
 
   function toScreen(x: number, y: number) {
     return {
@@ -534,15 +725,38 @@ export function CityMap() {
   }
 
   return (
-    <div className="relative h-dvh overflow-hidden bg-paper text-ink">
+    <div className={`relative h-dvh overflow-hidden bg-paper text-ink ${reduceMotion ? "motion-off" : ""}`}>
+      {engine === "3d" && layout === "village" && (
+        <div className={`absolute inset-0 ${inside ? "invisible" : ""}`}>
+          <Suspense fallback={null}>
+            <VillageCanvas
+              active={!inside && !masterId}
+              read={read}
+              celebrate={celebrate}
+              insets={insets}
+              onSelect={(id) => void select3d(id)}
+              onTree={(id) => {
+                dismissHint();
+                useVillage.getState().setTreeHover(null);
+                setMasterId(id);
+              }}
+              onInteract={dismissHint}
+              onProgress={(done, total, label) => setBoot3d({ done, total, label })}
+              onReady={() => setReady3d(true)}
+            />
+          </Suspense>
+        </div>
+      )}
+      {village3d && !inside && !ready3d && <VillageLoader done={boot3d.done} total={boot3d.total} label={boot3d.label} />}
       <div
         ref={frame}
-        className="absolute inset-0 touch-none select-none campus-lights"
+        className={`absolute inset-0 touch-none select-none campus-lights ${hide2d ? "pointer-events-none" : ""}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
+        {!hide2d && (
         <img
           key={sceneSrc}
           src={sceneSrc}
@@ -567,7 +781,8 @@ export function CityMap() {
             transformOrigin: "0 0",
           }}
         />
-        {!inside && !mapReady && (
+        )}
+        {!inside && !hide2d && !mapReady && (
           <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center" role="status" aria-live="polite">
             <div className="map-boot">
               {BOOT_BUBBLES.map(([token, left, bottom, delay]) => (
@@ -650,6 +865,7 @@ export function CityMap() {
               <button
                 key={plot.id}
                 type="button"
+                data-building={plot.id}
                 className="absolute z-20"
                 style={{ left: pos.left, top: pos.top, transform: "translate(-50%, -50%)" }}
                 onClick={(e) => {
@@ -716,10 +932,11 @@ export function CityMap() {
           })}
       </div>
 
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-40 flex items-start justify-between gap-2 p-3">
+      <header ref={headerRef} className="pointer-events-none absolute inset-x-0 top-0 z-40 flex items-start justify-between gap-2 p-3">
         <div className="pointer-events-auto flex max-w-[78%] items-start gap-2">
           {inside && (
             <button
+              ref={backRef}
               type="button"
               onClick={leave}
               className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-ink px-3 text-sm font-bold text-paper"
@@ -773,17 +990,41 @@ export function CityMap() {
               Help
             </button>
           )}
-          <button type="button" aria-label="Zoom in" className="grid size-11 place-items-center rounded-full border border-line bg-paper-2" onClick={() => zoomAt(vw / 2, vh / 2, 1.2)}>
+          <button
+            type="button"
+            aria-label="Zoom in"
+            className="grid size-11 place-items-center rounded-full border border-line bg-paper-2"
+            onClick={() => {
+              const c = camera3d();
+              if (c) c.zoom(1 / 1.25);
+              else zoomAt(vw / 2, vh / 2, 1.2);
+            }}
+          >
             <Plus className="size-5" />
           </button>
-          <button type="button" aria-label="Zoom out" className="grid size-11 place-items-center rounded-full border border-line bg-paper-2" onClick={() => zoomAt(vw / 2, vh / 2, 1 / 1.2)}>
+          <button
+            type="button"
+            aria-label="Zoom out"
+            className="grid size-11 place-items-center rounded-full border border-line bg-paper-2"
+            onClick={() => {
+              const c = camera3d();
+              if (c) c.zoom(1.25);
+              else zoomAt(vw / 2, vh / 2, 1 / 1.2);
+            }}
+          >
             <Minus className="size-5" />
           </button>
           {!inside && (
             <button
               type="button"
-              className="min-h-11 rounded-full bg-ink px-3 text-sm font-bold text-paper"
+              aria-label="Show the whole map"
+              className="min-h-11 min-w-11 rounded-full bg-ink px-3 text-sm font-bold text-paper"
               onClick={() => {
+                const c = camera3d();
+                if (c) {
+                  c.home();
+                  return;
+                }
                 const fit = fitScale(vw, vh, MAP_W, MAP_H);
                 animateTo({ x: MAP_W / 2, y: MAP_H / 2, s: fit }, 400);
               }}
@@ -794,11 +1035,35 @@ export function CityMap() {
         </div>
       </header>
 
-      <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-20 space-y-2 p-3">
-        {!inside && hover && (
+      <footer ref={footerRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 space-y-2 p-3">
+        {!inside && hover && !village3d && (
           <div className="pointer-events-none mx-auto max-w-md rounded-2xl border border-line bg-paper-2/95 px-3 py-2">
             <p className="text-sm font-bold">{wingById(hover)?.name}</p>
             <p className="text-xs leading-snug text-muted">{wingById(hover)?.blurb}</p>
+          </div>
+        )}
+        {!inside && hint && (village3d ? ready3d : mapReady) && (
+          <p className="village-hint pointer-events-none mx-auto w-fit rounded-full bg-ink px-4 py-2 text-sm font-bold text-paper-2 shadow-md" role="status">
+            {coarse ? "Tap a building to explore" : "Click a building to explore"}
+          </p>
+        )}
+        {!inside && bridge && (
+          <div className="pointer-events-auto mx-auto max-w-xl rounded-2xl border border-line bg-paper-2/95 px-3 py-2 shadow-sm" aria-live="polite">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-bold">
+                <span className="text-stamp">{bridge.name}</span>
+                <span className="text-muted"> · {bridge.wingIds.map((id) => SHORT[id] ?? wingById(id)?.name).join(" → ")}</span>
+              </p>
+              <button
+                type="button"
+                aria-label={`Clear ${bridge.name}`}
+                className="-mt-1 -mr-1 grid size-11 shrink-0 place-items-center rounded-full"
+                onClick={() => setBridgeId(null)}
+              >
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+            <p className="text-xs leading-snug text-muted">{bridge.summary}</p>
           </div>
         )}
         {inside ? (
@@ -811,25 +1076,43 @@ export function CityMap() {
             Back to map
           </button>
         ) : (
-          <div className="pointer-events-auto flex gap-2 overflow-x-auto">
-            <button type="button" className="shrink-0 rounded-full border border-line bg-paper-2 px-3 py-2 text-sm font-bold" onClick={() => setDirectory(true)}>
+          <div className="pointer-events-auto flex flex-wrap items-center gap-2">
+            <button type="button" className="min-h-11 rounded-full border border-line bg-paper-2 px-3 text-sm font-bold" onClick={() => setDirectory(true)}>
               Directory
             </button>
-            <button type="button" className="shrink-0 rounded-full border border-line bg-paper-2 px-3 py-2 text-sm font-bold" onClick={() => setSources(true)}>
+            <button type="button" className="min-h-11 rounded-full border border-line bg-paper-2 px-3 text-sm font-bold" onClick={() => setSources(true)}>
               Edition
             </button>
-            {bridges.map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => setBridgeId((cur) => (cur === b.id ? null : b.id))}
-                className={`shrink-0 rounded-full px-3 py-2 text-sm font-bold ${
-                  bridgeId === b.id ? "bg-stamp text-paper" : "border border-line bg-paper-2"
-                }`}
-              >
-                {b.name}
-              </button>
-            ))}
+            <button
+              type="button"
+              aria-pressed={reduceMotion}
+              className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-bold ${reduceMotion ? "bg-ink text-paper" : "border border-line bg-paper-2"}`}
+              onClick={() =>
+                setReduceMotion((v) => {
+                  writeJson(MOTION_KEY, !v);
+                  return !v;
+                })
+              }
+            >
+              <span aria-hidden="true" className={`size-2.5 rounded-full ${reduceMotion ? "bg-path" : "bg-line"}`} />
+              Reduce motion
+            </button>
+            <RoutesMenu current={bridgeId} onPick={(id) => setBridgeId((cur) => (cur === id ? null : id))} />
+            <div className="hidden flex-wrap gap-2 lg:flex" role="group" aria-label="Process routes">
+              {bridges.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  aria-pressed={bridgeId === b.id}
+                  onClick={() => setBridgeId((cur) => (cur === b.id ? null : b.id))}
+                  className={`min-h-11 rounded-full px-3 text-sm font-bold ${
+                    bridgeId === b.id ? "bg-stamp text-paper" : "border border-line bg-paper-2"
+                  }`}
+                >
+                  {b.name}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </footer>
@@ -839,6 +1122,14 @@ export function CityMap() {
         onClose={() => setDirectory(false)}
         onPick={(id) => {
           setDirectory(false);
+          dismissHint();
+          if (village3d) {
+            if (inside) {
+              leave();
+              window.setTimeout(() => useVillage.getState().camera?.focus(id), 1000);
+            } else useVillage.getState().camera?.focus(id);
+            return;
+          }
           if (inside) leave();
           const plot = plots.find((p) => p.id === id);
           if (!plot) return;
@@ -1058,5 +1349,86 @@ function Sources({ open, onClose }: { open: boolean; onClose: () => void }) {
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+function RoutesMenu({ current, onPick }: { current: string | null; onPick: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const active = bridges.find((b) => b.id === current);
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger
+        className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-bold lg:hidden ${active ? "bg-stamp text-paper" : "border border-line bg-paper-2"}`}
+      >
+        {active ? active.name : "Process routes"}
+        <ChevronDown className="size-4" aria-hidden="true" />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          side="top"
+          align="start"
+          sideOffset={8}
+          collisionPadding={12}
+          className="z-50 w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border border-line bg-paper-2 p-2 shadow-lg"
+        >
+          <p className="px-2 pt-1 pb-2 text-xs font-bold tracking-widest text-muted uppercase">Process routes</p>
+          <ul className="space-y-1">
+            {bridges.map((b) => (
+              <li key={b.id}>
+                <button
+                  type="button"
+                  aria-pressed={current === b.id}
+                  className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-3 text-left text-sm font-bold ${current === b.id ? "bg-stamp text-paper" : "hover:bg-paper"}`}
+                  onClick={() => {
+                    onPick(b.id);
+                    setOpen(false);
+                  }}
+                >
+                  {b.name}
+                  {current === b.id && <Check className="size-4" aria-hidden="true" />}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+function VillageLoader({ done, total, label }: { done: number; total: number; label: string }) {
+  const pct = Math.round((Math.min(done, total) / Math.max(1, total)) * 100);
+  return (
+    <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-paper" role="status" aria-live="polite">
+      <div className="flex flex-col items-center gap-4">
+        <div className="map-boot">
+          {BOOT_BUBBLES.map(([token, left, bottom, delay]) => (
+            <span key={token} className="map-bubble" style={{ left, bottom, animationDelay: delay }}>
+              {token}
+            </span>
+          ))}
+          <p className="map-boot-line">
+            <span className="map-boot-prompt">{">"}</span> loading village
+            <span className="map-boot-cursor">_</span>
+          </p>
+        </div>
+        <div className="w-56">
+          <div
+            className="h-2 overflow-hidden rounded-full border border-ink/20 bg-paper-2"
+            role="progressbar"
+            aria-label="Loading the 3D village"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={pct}
+          >
+            <div className="h-full rounded-full bg-stamp transition-[width] duration-200" style={{ width: `${pct}%` }} />
+          </div>
+          <p className="mt-2 flex justify-between font-mono text-xs font-bold text-muted">
+            <span>{label}</span>
+            <span className="tabular-nums">{pct}%</span>
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
