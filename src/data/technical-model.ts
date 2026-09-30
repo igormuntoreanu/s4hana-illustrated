@@ -279,6 +279,25 @@ export const technicalModels: Record<string, TechnicalModel> = {
       { name: "I_SalesContractItem", description: "Sales contract item." },
     ],
   },
+  "sd-ebrr": {
+    summary: "Event-based revenue recognition writes the accrual into the same journal as the goods issue or the invoice. There is no second revenue ledger.",
+    tables: [
+      {
+        name: "ACDOCA",
+        description: "Recognition, cost, and revenue lines. For sell-from-stock the sales order item is the account assignment.",
+        fields: [
+          f("RLDNR", "Ledger"),
+          f("RBUKRS", "Company code"),
+          f("BELNR", "Document number"),
+          f("RACCT", "Account"),
+          f("KDAUF", "Sales order"),
+          f("KDPOS", "Sales order item"),
+          f("HSL", "Amount in company-code currency"),
+        ],
+      },
+    ],
+    cds: [{ name: "I_JournalEntryItem", description: "Recognition lines, read with the other journal lines." }],
+  },
   "fin-gl": {
     summary: "A journal entry is a header plus lines. In S/4HANA the lines that you report on are the universal journal.",
     tables: [
@@ -336,9 +355,26 @@ export const technicalModels: Record<string, TechnicalModel> = {
           f("BUDAT", "Posting date"),
         ],
       },
+      {
+        name: "BSEG",
+        description: "Entry view. Still a table, not a compatibility view. Use it for the posting key and the customer or supplier line, not as the reporting ledger.",
+        fields: [
+          f("BUKRS", "Company code"),
+          f("BELNR", "Document number"),
+          f("GJAHR", "Fiscal year"),
+          f("BUZEI", "Line"),
+          f("BSCHL", "Posting key"),
+          f("KOART", "Account type"),
+          f("HKONT", "G/L account"),
+        ],
+      },
     ],
     odata: api("API_JOURNALENTRYITEMBASIC_SRV", "Journal Entry Item — Read"),
-    cds: [{ name: "I_JournalEntryItem", description: "Journal entry line, the usual read interface over the universal journal." }],
+    cds: [
+      { name: "I_JournalEntryItem", description: "Journal entry line on ACDOCA. This is the reporting interface." },
+      { name: "C_JournalEntryItemBrowser", description: "What Display Line Items in General Ledger (F2217) reads." },
+      { name: "C_OperationalAcctgDocBrowser", description: "What Display Line Item Entry (F2218) reads, from BSEG." },
+    ],
   },
   "fin-ap": {
     summary: "A logistics supplier invoice is matched to the purchase order. The open item is a journal line.",
@@ -420,8 +456,8 @@ export const technicalModels: Record<string, TechnicalModel> = {
         ],
       },
     ],
-    odata: api("sap-s4-CE_FIXEDASSET_0001-v1", "Fixed Asset — Master Data"),
-    cds: [{ name: "I_FixedAsset", description: "Fixed asset master data." }],
+    odata: api("API_FIXEDASSET_SRV", "Fixed Asset (A2X)"),
+    cds: [{ name: "I_FixedAsset", description: "Fixed asset master data. Values themselves are journal lines, not a second asset ledger." }],
   },
   "pr-op": {
     summary: "Purchase order header and item.",
@@ -567,7 +603,7 @@ export const technicalModels: Record<string, TechnicalModel> = {
     tables: [
       {
         name: "MATDOC",
-        description: "Material document item. This is the inventory line in S/4HANA.",
+        description: "Material document. Holds the old header (MKPF) and item (MSEG) in one table. Those two names are compatibility proxies.",
         fields: [
           f("MBLNR", "Material document"),
           f("MJAHR", "Material document year"),
@@ -602,7 +638,7 @@ export const technicalModels: Record<string, TechnicalModel> = {
         ],
       },
     ],
-    odata: api("WAREHOUSEORDER_0001", "Warehouse Order and Task (A2X)"),
+    odata: api("API_WAREHOUSE_ORDER_TASK_2", "Warehouse Order and Task (A2X)"),
     cds: [],
   },
   "sc-batch": {
@@ -787,7 +823,7 @@ export const technicalModels: Record<string, TechnicalModel> = {
     cds: [{ name: "I_PurchaseOrderItem", description: "Purchase order item, including a subcontracting item." }],
   },
   "sv-ord": {
-    summary: "Read the service order through the released service order API. The on-premise table layout is release-sensitive, so it is not listed here.",
+    summary: "On 2025 FPS01 the current service is OData V4: service group API_SERVICEORDER, service ServiceOrder, version 0001. The older V2 API is still published.",
     tables: [],
     odata: api("API_SERVICE_ORDER_SRV", "Service Order (A2X)"),
     cds: [
@@ -816,7 +852,7 @@ export const technicalModels: Record<string, TechnicalModel> = {
     cds: [{ name: "I_MaintenanceNotification", description: "Maintenance notification." }],
   },
   "am-pm": {
-    summary: "A maintenance order is an order header plus the maintenance-specific data and the operations.",
+    summary: "A maintenance order is an order header plus operations. API_MAINTENANCEORDER version 2 creates and changes the order, not only reads it.",
     tables: [
       {
         name: "AUFK",

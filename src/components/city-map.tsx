@@ -18,6 +18,7 @@ import { TechnicalModelCard } from "@/components/technical-model";
 import { AppleTree } from "@/components/apple-tree";
 import { MasterDataPanel } from "@/components/master-data-panel";
 import { masterTrees } from "@/data/master-trees";
+import { shelfForWing } from "@/data/books";
 import { useProgress } from "@/state/progress";
 
 const MAP_W = 2128;
@@ -279,6 +280,7 @@ export function CityMap() {
   const [bridgeId, setBridgeId] = useState<string | null>(null);
   const [directory, setDirectory] = useState(false);
   const [sources, setSources] = useState(false);
+  const [help, setHelp] = useState(false);
   const drag = useRef<{ id: number; x: number; y: number; cx: number; cy: number; moved: boolean } | null>(null);
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinch = useRef<{ d: number; s: number } | null>(null);
@@ -408,6 +410,7 @@ export function CityMap() {
     setInside(null);
     setHover(null);
     setStation(null);
+    setHelp(false);
     const fit = fitScale(vw, vh, MAP_W, MAP_H);
     const next = clampCam({ x: MAP_W / 2, y: MAP_H / 2, s: Math.max(fit, 0.36) }, vw, vh, MAP_W, MAP_H, fit * 0.96, 2.2);
     camRef.current = next;
@@ -496,8 +499,8 @@ export function CityMap() {
   const bridge = bridges.find((b) => b.id === bridgeId) ?? null;
   const sceneSrc = room
     ? layout === "city"
-      ? `${room.city}?v=5`
-      : room.src
+      ? `${room.city}?v=7`
+      : `${room.src}?v=7`
     : layout === "city"
       ? "/art/city-map.jpg"
       : "/art/campus-map.jpg?v=4";
@@ -515,7 +518,7 @@ export function CityMap() {
     const urls = [
       "/art/campus-map.jpg?v=4",
       "/art/city-map.jpg",
-      ...Object.values(ROOMS).flatMap((r) => [r.src, `${r.city}?v=5`]),
+      ...Object.values(ROOMS).flatMap((r) => [`${r.src}?v=7`, `${r.city}?v=7`]),
     ];
     for (const url of urls) {
       const img = new Image();
@@ -713,7 +716,7 @@ export function CityMap() {
           })}
       </div>
 
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-3">
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-40 flex items-start justify-between gap-2 p-3">
         <div className="pointer-events-auto flex max-w-[78%] items-start gap-2">
           {inside && (
             <button
@@ -759,7 +762,17 @@ export function CityMap() {
             </p>
           </div>
         </div>
-        <div className="pointer-events-auto flex flex-col gap-2">
+        <div className="pointer-events-auto flex flex-col items-end gap-2">
+          {inside && (
+            <button
+              type="button"
+              aria-label="Help. Open the SAP PRESS book list."
+              className="grid size-14 place-items-center rounded-full bg-stamp text-sm font-bold text-paper shadow-sm"
+              onClick={() => setHelp(true)}
+            >
+              Help
+            </button>
+          )}
           <button type="button" aria-label="Zoom in" className="grid size-11 place-items-center rounded-full border border-line bg-paper-2" onClick={() => zoomAt(vw / 2, vh / 2, 1.2)}>
             <Plus className="size-5" />
           </button>
@@ -835,12 +848,14 @@ export function CityMap() {
         }}
       />
       <Sources open={sources} onClose={() => setSources(false)} />
+      <Books open={help} wingId={inside} onClose={() => setHelp(false)} />
       <StationSheet
         station={station}
         wing={wing}
         read={read}
         onClose={() => setStation(null)}
         onMark={(id) => mark(id)}
+        onHelp={() => setHelp(true)}
       />
       <MasterDataPanel key={masterId ?? "closed"} treeId={masterId} onClose={() => setMasterId(null)} />
     </div>
@@ -902,12 +917,14 @@ function StationSheet({
   read,
   onClose,
   onMark,
+  onHelp,
 }: {
   station: Station | null;
   wing: Wing | null | undefined;
   read: string[];
   onClose: () => void;
   onMark: (id: string) => void;
+  onHelp: () => void;
 }) {
   const seen = station ? read.includes(station.id) : false;
   const sample = station ? studyObjects[station.id] : undefined;
@@ -926,9 +943,19 @@ function StationSheet({
                   </Dialog.Description>
                   <Dialog.Title className="mt-1 text-3xl font-semibold">{station.title}</Dialog.Title>
                 </div>
-                <Dialog.Close className="grid size-11 shrink-0 place-items-center rounded-full border border-line" aria-label="Close">
-                  <X className="size-5" />
-                </Dialog.Close>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="Help. Open the SAP PRESS book list."
+                    className="grid size-14 place-items-center rounded-full bg-stamp text-sm font-bold text-paper shadow-sm"
+                    onClick={onHelp}
+                  >
+                    Help
+                  </button>
+                  <Dialog.Close className="grid size-11 place-items-center rounded-full border border-line" aria-label="Close">
+                    <X className="size-5" />
+                  </Dialog.Close>
+                </div>
               </div>
               <p className="mt-4 text-base leading-relaxed">{station.body}</p>
               <ul className="mt-4 space-y-2">
@@ -973,6 +1000,39 @@ function StationSheet({
               </button>
             </>
           )}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+function Books({ open, wingId, onClose }: { open: boolean; wingId: string | null; onClose: () => void }) {
+  const shelf = wingId ? shelfForWing(wingId) : null;
+  return (
+    <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-ink/40" />
+        <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-dvh overflow-y-auto rounded-t-3xl bg-paper-2 px-5 pt-5 pb-8 sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl">
+          <Dialog.Title className="text-2xl font-semibold">Help</Dialog.Title>
+          <Dialog.Description className="mt-2 text-sm leading-relaxed text-muted">
+            {shelf
+              ? `${shelf.area}. These SAP PRESS books match this building. A title may cover more than on-premise 2025 FPS01.`
+              : "Open a building, then Help shows the books for that area."}
+          </Dialog.Description>
+          <ul className="mt-4 space-y-2">
+            {shelf?.books.map((item) => (
+              <li key={item.href}>
+                <a href={item.href} target="_blank" rel="noreferrer" className="block rounded-2xl border border-line bg-paper px-3 py-2">
+                  <span className="block text-sm font-semibold">{item.title}</span>
+                  <span className="mt-0.5 block text-xs text-muted">{item.authors}</span>
+                  <span className="mt-1 block text-sm leading-relaxed">{item.note}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          <Dialog.Close className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-ink font-bold text-paper">
+            Close
+          </Dialog.Close>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

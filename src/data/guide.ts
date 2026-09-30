@@ -71,13 +71,14 @@ export const wings: Wing[] = [
         system: [
           "Table ACDOCA — actual line items; ACDOCP — plan",
           "Leading ledger 0L, plus non-leading ledgers and extension ledgers for parallel accounting",
-          "BSEG remains a compatibility view, not the place you design new reports",
+          "BSEG is still a table: the entry view (posting key, customer or supplier line). New reports read ACDOCA",
+          "Compatibility views, not BSEG: BSID, BSIK, BSIS, BSAD, BSAK, BSAS, FAGLFLEXT, GLT0, and the old CO totals COSP and COSS",
         ],
         fiori: "Display Line Items in General Ledger",
         appId: "F2217",
         tcode: "FAGLL03",
         versusEcc:
-          "ECC kept FI (BSEG), CO (COEP), asset values, and costing-based CO-PA in separate ledgers. S/4HANA posts them once into ACDOCA. The material ledger is mandatory, so inventory value is a journal line.",
+          "ECC kept FI (BSEG), CO (COEP), asset values, and costing-based CO-PA in separate ledgers. S/4HANA posts them once into ACDOCA. The material ledger is mandatory, so inventory value is a journal line. Display Line Items in General Ledger (F2217) reads ACDOCA. Display Line Item Entry (F2218) still reads the BSEG entry view.",
       },
       {
         id: "fin-gl",
@@ -120,12 +121,13 @@ export const wings: Wing[] = [
           "Customer invoice document type DR; credit memo DG; incoming payment DZ",
           "SD billing posts accounting document type RV into ACDOCA",
           "Credit master is the business partner credit profile (UKM), role UKM000",
+          "Post Incoming Payments (F1345) clears one payment against open items, including residual items with a reason code",
         ],
         fiori: "Post Incoming Payments",
+        appId: "F1345",
         tcode: "F-28 · FB70 · BP",
         versusEcc:
           "In ECC a customer was a separate master (XD01) and credit often lived on the old credit master (FD32). In S/4HANA the customer is a business partner, and one partner can be both customer and supplier. Billing creates the finance document; you do not retype it. Incoming payments clear those open items. Credit is SAP Credit Management on the business partner.",
-        flag: "The Fiori name Post Incoming Payments is stable; confirm the current app ID in the Fiori apps reference library for 2025 FPS01 before you put it on a training slide.",
       },
       {
         id: "fin-aa",
@@ -134,14 +136,15 @@ export const wings: Wing[] = [
         body: "New Asset Accounting is the only asset accounting. Acquisitions, retirements, and depreciation are Universal Journal lines with asset fields filled in — there is no separate asset ledger to reconcile to the GL. A valuated goods receipt against an asset purchase order already capitalizes; a non-integrated acquisition is a dedicated posting.",
         system: [
           "Depreciation run posts with FAA_DEPRECIATION_POST (classic transaction AFAB schedules it)",
-          "Asset master: asset class, depreciation areas aligned to ledgers",
+          "Asset master stays in ANLA. Old value tables ANEP, ANLC, ANLP, and ANEA are compatibility views over ACDOCA",
           "Settlement of an asset under construction from an investment project or a WBS",
         ],
         fiori: "Manage Fixed Assets",
+        appId: "F3425",
         tcode: "AS01 · AFAB · ABZON",
         versusEcc:
           "Classic Asset Accounting (the old reconciliation accounts and periodic posting to GL) cannot be used. Depreciation areas follow the ledger approach.",
-        flag: "Confirm the current Manage Fixed Assets app ID for 2025 FPS01 in the Fiori apps reference library. AS01 still creates a master; many projects now stay in the Fiori app.",
+        flag: "Manage Fixed Assets is F3425. Cloud Public Edition 2608 deprecates that tile in favor of F3425A. On 2025 on-premise, check which tile your Fiori catalog actually assigned before you print the ID.",
       },
       {
         id: "fin-fpa",
@@ -370,6 +373,7 @@ export const wings: Wing[] = [
           "MIGO — movement 101 goods receipt, 261 issue to a production order, 601 issue for a delivery",
           "Stock types: unrestricted, quality inspection, blocked",
           "Physical inventory — MI01 count document, MI04 enter count, MI07 post difference",
+          "MATDOC stores the document. MKPF and MSEG are compatibility proxies. Stock quantity is calculated from MATDOC, not stored as a balance in MARD",
         ],
         fiori: "Manage Stock · Post Goods Movement",
         tcode: "MIGO · MI01",
@@ -386,6 +390,7 @@ export const wings: Wing[] = [
           "Inbound delivery /SCWM/PRDI — warehouse tasks for putaway",
           "Outbound /SCWM/PRDO — picking and staging",
           "Monitor /SCWM/MON",
+          "Released ABAP APIs: /SCWM/IF_API_WHSE_ORDER and /SCWM/IF_API_WHSE_TASK. OData: API_WAREHOUSE_ORDER_TASK_2",
         ],
         fiori: "Process Warehouse Tasks · Run Outbound Process",
         tcode: "/SCWM/MON · /SCWM/PRDI · /SCWM/PRDO",
@@ -624,8 +629,8 @@ export const wings: Wing[] = [
         body: "Event-based revenue recognition posts accruals and deferrals into ACDOCA when the business event happens — goods issue, invoice, or a period-end completion — instead of waiting for a classic results-analysis run to invent them. Sell-from-stock often recognizes at goods issue. Milestone and period billing need an explicit method.",
         system: [
           "Component CO-PC-OBJ-EBR",
-          "Recognition keys are derived from the item; postings are journal lines",
-          "Apps: Event-Based Revenue Recognition — Sales Orders, and Manage Realized Revenue and COGS",
+          "Sell-from-stock uses the sales order item as the account assignment. The recognition key decides the method. Postings are ACDOCA lines",
+          "Apps: Event-Based Revenue Recognition — Sales Orders (Version 2), and the period-end run Run Revenue Recognition — Sales Orders",
         ],
         fiori: "Event-Based Revenue Recognition — Sales Orders",
         tcode: "Monitored in the EBRR apps rather than a single classic code",
